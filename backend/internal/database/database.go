@@ -1,0 +1,91 @@
+package database
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+
+	_ "github.com/lib/pq"
+)
+
+func Connect(databaseURL string) (*sql.DB, error) {
+	db, err := sql.Open("postgres", databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+
+	log.Println("Connected to database")
+	return db, nil
+}
+
+func Migrate(db *sql.DB) error {
+	migrations := []string{
+		`CREATE TABLE IF NOT EXISTS trade_decisions (
+			id SERIAL PRIMARY KEY,
+			agent_id VARCHAR(50) NOT NULL,
+			stock_code VARCHAR(20) NOT NULL,
+			market VARCHAR(10) NOT NULL,
+			action VARCHAR(10) NOT NULL,
+			quantity INTEGER,
+			price DECIMAL(15, 4),
+			reason TEXT,
+			llm_response JSONB,
+			executed BOOLEAN DEFAULT FALSE,
+			executed_at TIMESTAMP,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS positions (
+			id SERIAL PRIMARY KEY,
+			stock_code VARCHAR(20) NOT NULL,
+			market VARCHAR(10) NOT NULL,
+			quantity INTEGER NOT NULL,
+			avg_cost DECIMAL(15, 4) NOT NULL,
+			current_price DECIMAL(15, 4),
+			unrealized_pnl DECIMAL(15, 4),
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(stock_code, market)
+		)`,
+		`CREATE TABLE IF NOT EXISTS account_funds (
+			id SERIAL PRIMARY KEY,
+			total_assets DECIMAL(15, 4),
+			cash DECIMAL(15, 4),
+			market_value DECIMAL(15, 4),
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS agent_configs (
+			id SERIAL PRIMARY KEY,
+			agent_id VARCHAR(50) UNIQUE NOT NULL,
+			name VARCHAR(100),
+			description TEXT,
+			llm_model VARCHAR(100),
+			llm_endpoint VARCHAR(255),
+			trading_strategy TEXT,
+			risk_parameters JSONB,
+			enabled BOOLEAN DEFAULT TRUE,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+		`CREATE TABLE IF NOT EXISTS system_configs (
+			key VARCHAR(100) PRIMARY KEY,
+			value TEXT NOT NULL,
+			description TEXT,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+		)`,
+	}
+
+	for _, migration := range migrations {
+		if _, err := db.Exec(migration); err != nil {
+			return fmt.Errorf("failed to execute migration: %w", err)
+		}
+	}
+
+	log.Println("Database migrations completed")
+	return nil
+}

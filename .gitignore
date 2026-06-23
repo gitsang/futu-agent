@@ -1,0 +1,52 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build artifacts
+dist/
+builds/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+.npm
+.yarn
+.pnp.*
+
+# SvelteKit
+.svelte-kit/
+build/
+
+# Go
+vendor/
+
+# Database
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Docker
+docker-compose.override.yml
+
+# Temporary
+tmp/
+temp/

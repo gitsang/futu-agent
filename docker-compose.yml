@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: futu-agent-db
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: futu_agent
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    command: postgres -p 5434
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h 127.0.0.1 -p 5434"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  futu-opend:
+    build:
+      context: .
+      dockerfile: futu-opend/Dockerfile
+    container_name: futu-opend
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      FUTU_LOGIN_ACCOUNT: ${FUTU_LOGIN_ACCOUNT:-36474237}
+      FUTU_LOGIN_PWD_MD5: ${FUTU_LOGIN_PWD_MD5:-d63b1d22c9141885b5809965be2e9d64}
+      HTTP_PROXY: http://ops.yl.c8g.top:7890
+      HTTPS_PROXY: http://ops.yl.c8g.top:7890
+      http_proxy: http://ops.yl.c8g.top:7890
+      https_proxy: http://ops.yl.c8g.top:7890
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/net/tcp | grep 2B67 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        HTTP_PROXY: http://ops.yl.c8g.top:7890
+        HTTPS_PROXY: http://ops.yl.c8g.top:7890
+    container_name: futu-agent-backend
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SERVER_PORT: "9080"
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5434/futu_agent?sslmode=disable
+      FUTU_OPEND_HOST: 127.0.0.1
+      FUTU_OPEND_PORT: "11111"
+      LLM_BASE_URL: ${LLM_BASE_URL:-https://token-plan-cn.xiaomimimo.com/v1}
+      LLM_API_KEY: ${LLM_API_KEY:-tp-ca7ufcktq93n1d4os497i20jh592iwagxz5g1e50zmtoudim}
+      LLM_MODEL: ${LLM_MODEL:-mimo-v2.5-pro}
+      HTTP_PROXY: http://ops.yl.c8g.top:7890
+      HTTPS_PROXY: http://ops.yl.c8g.top:7890
+      TRADING_ENABLED: ${TRADING_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      futu-opend:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: futu-agent-frontend
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      PORT: "9000"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
