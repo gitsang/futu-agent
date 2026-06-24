@@ -142,11 +142,11 @@
 							<div class="flex items-center justify-between mb-1">
 								<div class="flex items-center gap-2">
 									<span class="font-medium text-text-primary">{decision.stock_code}</span>
-									<Badge
-										variant={decision.action === 'buy' ? 'success' : decision.action === 'sell' ? 'destructive' : 'default'}
-									>
-										{decision.action === 'buy' ? '买入' : decision.action === 'sell' ? '卖出' : '持有'}
-									</Badge>
+							<Badge
+									variant={decision.action.toLowerCase() === 'buy' ? 'success' : decision.action.toLowerCase() === 'sell' ? 'destructive' : 'default'}
+								>
+									{decision.action.toLowerCase() === 'buy' ? '买入' : decision.action.toLowerCase() === 'sell' ? '卖出' : '持有'}
+								</Badge>
 								</div>
 								<Badge variant={decision.executed ? 'success' : 'warning'}>
 									{decision.executed ? '已执行' : '待执行'}

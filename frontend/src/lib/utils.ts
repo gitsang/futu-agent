@@ -1,4 +1,4 @@
-export function formatCurrency(value: number, currency = 'HKD'): string {
+export function formatCurrency(value: number, currency = 'CNY'): string {
 	return new Intl.NumberFormat('zh-CN', {
 		style: 'currency',
 		currency,
