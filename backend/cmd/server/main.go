@@ -15,11 +15,11 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/gitsang/futu-agent/backend/internal/config"
-	"github.com/gitsang/futu-agent/backend/internal/database"
 	"github.com/gitsang/futu-agent/backend/internal/handlers"
 	"github.com/gitsang/futu-agent/backend/internal/services/agent"
 	"github.com/gitsang/futu-agent/backend/internal/services/futu"
 	"github.com/gitsang/futu-agent/backend/internal/services/llm"
+	"github.com/gitsang/futu-agent/backend/internal/store"
 )
 
 func main() {
@@ -28,15 +28,7 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	db, err := database.Connect(cfg.DatabaseURL)
-	if err != nil {
-		log.Fatalf("Failed to connect to database: %v", err)
-	}
-	defer db.Close()
-
-	if err := database.Migrate(db); err != nil {
-		log.Fatalf("Failed to run database migrations: %v", err)
-	}
+	memoryStore := store.NewMemoryStore()
 
 	futuClient, err := futu.NewClient(cfg.FutuOpendHost, cfg.FutuOpendPort)
 	if err != nil {
@@ -45,9 +37,9 @@ func main() {
 	defer futuClient.Close()
 
 	llmClient := llm.NewClient(cfg.LLMBaseURL, cfg.LLMModel, cfg.LLMAPIKey, cfg.HTTPProxy)
-	agentEngine := agent.NewEngine(db, futuClient, llmClient, cfg)
+	agentEngine := agent.NewEngine(memoryStore, futuClient, llmClient, cfg)
 
-	handler := handlers.NewHandler(db, agentEngine, futuClient)
+	handler := handlers.NewHandler(memoryStore, cfg, agentEngine, futuClient)
 
 	r := chi.NewRouter()
 
@@ -72,11 +64,7 @@ func main() {
 		r.Get("/decisions/{id}", handler.GetDecision)
 
 		r.Get("/agents", handler.GetAgents)
-		r.Post("/agents", handler.CreateAgent)
 		r.Put("/agents/{id}", handler.UpdateAgent)
-		r.Delete("/agents/{id}", handler.DeleteAgent)
-		r.Post("/agents/{id}/start", handler.StartAgent)
-		r.Post("/agents/{id}/stop", handler.StopAgent)
 
 		r.Get("/config", handler.GetConfig)
 		r.Put("/config", handler.UpdateConfig)

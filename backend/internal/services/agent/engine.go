@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,44 +12,37 @@ import (
 	"github.com/gitsang/futu-agent/backend/internal/config"
 	"github.com/gitsang/futu-agent/backend/internal/services/futu"
 	"github.com/gitsang/futu-agent/backend/internal/services/llm"
+	"github.com/gitsang/futu-agent/backend/internal/store"
 )
 
 type Engine struct {
-	db          *sql.DB
-	futuClient  *futu.Client
-	llmClient   *llm.Client
-	config      *config.Config
-	agents      map[int64]*AgentWorker
-	mu          sync.RWMutex
-	ctx         context.Context
-	cancel      context.CancelFunc
+	store          *store.MemoryStore
+	futuClient     *futu.Client
+	llmClient      *llm.Client
+	config         *config.Config
+	agents         map[string]*AgentWorker
+	mu             sync.RWMutex
+	ctx            context.Context
+	cancel         context.CancelFunc
 	tradingEnabled bool
 }
 
 type AgentWorker struct {
-	ID        int64
-	AgentID   string
-	Config    AgentConfig
-	ctx       context.Context
-	cancel    context.CancelFunc
-	running   bool
-	mu        sync.Mutex
+	AgentID string
+	Config  config.AgentConfig
+	ctx     context.Context
+	cancel  context.CancelFunc
+	running bool
+	mu      sync.Mutex
 }
 
-type AgentConfig struct {
-	Name            string
-	Description     string
-	TradingStrategy string
-	Enabled         bool
-}
-
-func NewEngine(db *sql.DB, futuClient *futu.Client, llmClient *llm.Client, cfg *config.Config) *Engine {
+func NewEngine(store *store.MemoryStore, futuClient *futu.Client, llmClient *llm.Client, cfg *config.Config) *Engine {
 	return &Engine{
-		db:             db,
+		store:          store,
 		futuClient:     futuClient,
 		llmClient:      llmClient,
 		config:         cfg,
-		agents:         make(map[int64]*AgentWorker),
+		agents:         make(map[string]*AgentWorker),
 		tradingEnabled: cfg.TradingEnabled,
 	}
 }
@@ -58,9 +50,7 @@ func NewEngine(db *sql.DB, futuClient *futu.Client, llmClient *llm.Client, cfg *
 func (e *Engine) Start(ctx context.Context) error {
 	e.ctx, e.cancel = context.WithCancel(ctx)
 
-	if err := e.loadAgents(); err != nil {
-		return fmt.Errorf("failed to load agents: %w", err)
-	}
+	e.loadAgents()
 
 	go e.runLoop()
 
@@ -81,42 +71,21 @@ func (e *Engine) Stop() {
 	log.Println("Agent engine stopped")
 }
 
-func (e *Engine) loadAgents() error {
-	rows, err := e.db.Query(`
-		SELECT id, agent_id, name, description, trading_strategy, enabled
-		FROM agent_configs
-		WHERE enabled = TRUE
-	`)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
+func (e *Engine) loadAgents() {
+	e.mu.Lock()
+	defer e.mu.Unlock()
 
-	for rows.Next() {
-		var id int64
-		var agentID, name, description, strategy string
-		var enabled bool
-
-		if err := rows.Scan(&id, &agentID, &name, &description, &strategy, &enabled); err != nil {
-			log.Printf("Failed to scan agent config: %v", err)
-			continue
+	for _, agentCfg := range e.config.Agents {
+		if agentCfg.Enabled {
+			worker := &AgentWorker{
+				AgentID: agentCfg.ID,
+				Config:  agentCfg,
+				running: true,
+			}
+			e.agents[agentCfg.ID] = worker
+			log.Printf("Loaded agent: %s (%s)", agentCfg.ID, agentCfg.Name)
 		}
-
-		worker := &AgentWorker{
-			ID:      id,
-			AgentID: agentID,
-			Config: AgentConfig{
-				Name:            name,
-				Description:     description,
-				TradingStrategy: strategy,
-				Enabled:         enabled,
-			},
-		}
-
-		e.agents[id] = worker
 	}
-
-	return nil
 }
 
 func (e *Engine) runLoop() {
@@ -163,35 +132,42 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 
 	log.Printf("Executing agent %s", worker.AgentID)
 
-	accountFunds, err := e.futuClient.GetAccountFunds(ctx, "CN")
+	market := worker.Config.Market
+
+	accountFunds, err := e.futuClient.GetAccountFunds(ctx, market)
 	if err != nil {
 		log.Printf("Failed to get account funds: %v", err)
 		return
 	}
 
-	positions, err := e.futuClient.GetPositions(ctx, "CN")
+	positions, err := e.futuClient.GetPositions(ctx, market)
 	if err != nil {
 		log.Printf("Failed to get positions: %v", err)
 		return
 	}
 
 	var marketDataLines []string
-	marketDataLines = append(marketDataLines, "=== A股市场数据 ===")
+	marketDataLines = append(marketDataLines, fmt.Sprintf("=== %s市场数据 ===", market))
 	marketDataLines = append(marketDataLines, "")
 	marketDataLines = append(marketDataLines, "【账户概况】")
 	marketDataLines = append(marketDataLines, fmt.Sprintf("总资产: %.2f", accountFunds.TotalAssets))
 	marketDataLines = append(marketDataLines, fmt.Sprintf("可用资金: %.2f", accountFunds.Cash))
 	marketDataLines = append(marketDataLines, fmt.Sprintf("持仓市值: %.2f", accountFunds.MarketValue))
-	marketDataLines = append(marketDataLines, fmt.Sprintf("仓位比例: %.1f%%", accountFunds.MarketValue/accountFunds.TotalAssets*100))
+	if accountFunds.TotalAssets > 0 {
+		marketDataLines = append(marketDataLines, fmt.Sprintf("仓位比例: %.1f%%", accountFunds.MarketValue/accountFunds.TotalAssets*100))
+	}
 	marketDataLines = append(marketDataLines, "")
 	marketDataLines = append(marketDataLines, "【当前持仓】")
 	if len(positions) == 0 {
 		marketDataLines = append(marketDataLines, "无持仓")
 	} else {
 		for _, pos := range positions {
-			pnlPct := (pos.CurrentPrice - pos.AvgCost) / pos.AvgCost * 100
-			marketDataLines = append(marketDataLines, fmt.Sprintf("- %s.%s: 持有%d股, 成本价%.2f, 现价%.2f, 盈亏%.2f (%.2f%%)", 
-				pos.Market, pos.Code, pos.Quantity, pos.AvgCost, pos.CurrentPrice, pos.UnrealizedPnL, pnlPct))
+			pnlPct := 0.0
+			if pos.AvgCost > 0 {
+				pnlPct = (pos.CurrentPrice - pos.AvgCost) / pos.AvgCost * 100
+			}
+			marketDataLines = append(marketDataLines, fmt.Sprintf("- %s (%s): 持有%d股, 成本价%.2f, 现价%.2f, 盈亏%.2f%%", 
+				pos.Name, pos.Code, pos.Quantity, pos.AvgCost, pos.CurrentPrice, pnlPct))
 		}
 	}
 
@@ -212,27 +188,22 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		return
 	}
 
-	e.saveDecision(worker.AgentID, decision)
+	savedDecision := e.store.SaveDecision(store.TradeDecision{
+		AgentID:   worker.AgentID,
+		StockCode: decision.Code,
+		Market:    decision.Market,
+		Action:    decision.Action,
+		Quantity:  decision.Quantity,
+		Price:     decision.Price,
+		Reason:    decision.Reason,
+	})
 
 	if e.tradingEnabled {
-		e.executeTrade(ctx, decision)
+		e.executeTrade(ctx, decision, savedDecision.ID)
 	}
 }
 
-func (e *Engine) saveDecision(agentID string, decision *llm.TradeDecision) {
-	decisionJSON, _ := json.Marshal(decision)
-
-	_, err := e.db.Exec(`
-		INSERT INTO trade_decisions (agent_id, stock_code, market, action, quantity, price, reason, llm_response, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-	`, agentID, decision.Code, decision.Market, decision.Action, decision.Quantity, decision.Price, decision.Reason, decisionJSON, time.Now())
-
-	if err != nil {
-		log.Printf("Failed to save decision: %v", err)
-	}
-}
-
-func (e *Engine) executeTrade(ctx context.Context, decision *llm.TradeDecision) {
+func (e *Engine) executeTrade(ctx context.Context, decision *llm.TradeDecision, decisionID int64) {
 	log.Printf("Executing trade: %s %s %d @ %.2f", decision.Action, decision.Code, decision.Quantity, decision.Price)
 
 	orderID, err := e.futuClient.PlaceOrder(ctx, decision.Market, decision.Code, decision.Action, decision.Price, decision.Quantity)
@@ -243,102 +214,7 @@ func (e *Engine) executeTrade(ctx context.Context, decision *llm.TradeDecision) 
 
 	log.Printf("Trade executed successfully, order ID: %s", orderID)
 
-	_, err = e.db.Exec(`
-		UPDATE trade_decisions 
-		SET executed = TRUE, executed_at = $1 
-		WHERE stock_code = $2 AND market = $3 AND action = $4 AND created_at = (
-			SELECT MAX(created_at) FROM trade_decisions WHERE stock_code = $2 AND market = $3 AND action = $4
-		)
-	`, time.Now(), decision.Code, decision.Market, decision.Action)
-	if err != nil {
-		log.Printf("Failed to update decision status: %v", err)
-	}
-}
-
-func (e *Engine) StartAgent(id int64) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	worker, exists := e.agents[id]
-	if !exists {
-		var agentID, name, description, strategy string
-		var enabled bool
-		err := e.db.QueryRow(`
-			SELECT agent_id, name, description, trading_strategy, enabled
-			FROM agent_configs WHERE id = $1
-		`, id).Scan(&agentID, &name, &description, &strategy, &enabled)
-		if err != nil {
-			return fmt.Errorf("agent %d not found: %w", id, err)
-		}
-
-		worker = &AgentWorker{
-			ID:      id,
-			AgentID: agentID,
-			Config: AgentConfig{
-				Name:            name,
-				Description:     description,
-				TradingStrategy: strategy,
-				Enabled:         true,
-			},
-		}
-		e.agents[id] = worker
-	}
-
-	worker.mu.Lock()
-	defer worker.mu.Unlock()
-
-	if worker.running {
-		return fmt.Errorf("agent %d already running", id)
-	}
-
-	_, err := e.db.Exec("UPDATE agent_configs SET enabled = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1", id)
-	if err != nil {
-		return fmt.Errorf("failed to enable agent: %w", err)
-	}
-
-	worker.Config.Enabled = true
-	worker.running = true
-
-	log.Printf("Agent %s started", worker.AgentID)
-	return nil
-}
-
-func (e *Engine) StopAgent(id int64) error {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-
-	worker, exists := e.agents[id]
-	if !exists {
-		return fmt.Errorf("agent %d not found", id)
-	}
-
-	worker.mu.Lock()
-	defer worker.mu.Unlock()
-
-	if !worker.running {
-		return fmt.Errorf("agent %d not running", id)
-	}
-
-	_, err := e.db.Exec("UPDATE agent_configs SET enabled = FALSE, updated_at = CURRENT_TIMESTAMP WHERE id = $1", id)
-	if err != nil {
-		return fmt.Errorf("failed to disable agent: %w", err)
-	}
-
-	worker.Config.Enabled = false
-	worker.running = false
-
-	log.Printf("Agent %s stopped", worker.AgentID)
-	return nil
-}
-
-func (a *AgentWorker) Stop() {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-
-	if a.cancel != nil {
-		a.cancel()
-	}
-	a.running = false
+	e.store.MarkExecuted(decisionID)
 }
 
 func (e *Engine) GetFutuOpendStatus() string {
@@ -350,4 +226,14 @@ func (e *Engine) GetFutuOpendStatus() string {
 
 func (e *Engine) IsTradingEnabled() bool {
 	return e.tradingEnabled
+}
+
+func (a *AgentWorker) Stop() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if a.cancel != nil {
+		a.cancel()
+	}
+	a.running = false
 }
