@@ -133,8 +133,8 @@ func (c *Client) GetAccountFunds(ctx context.Context) (*AccountFunds, error) {
 
 	return &AccountFunds{
 		TotalAssets: 1000000.0,
-		Cash:        500000.0,
-		MarketValue: 500000.0,
+		Cash:        650000.0,
+		MarketValue: 350000.0,
 	}, nil
 }
 
@@ -143,7 +143,24 @@ func (c *Client) GetPositions(ctx context.Context) ([]Position, error) {
 		return nil, fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	return []Position{}, nil
+	return []Position{
+		{
+			Code:          "600519",
+			Market:        "CN",
+			Quantity:      100,
+			AvgCost:       1500.00,
+			CurrentPrice:  1520.50,
+			UnrealizedPnL: 2050.00,
+		},
+		{
+			Code:          "000858",
+			Market:        "CN",
+			Quantity:      200,
+			AvgCost:       120.00,
+			CurrentPrice:   118.30,
+			UnrealizedPnL: -340.00,
+		},
+	}, nil
 }
 
 func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, price float64, quantity int) (string, error) {

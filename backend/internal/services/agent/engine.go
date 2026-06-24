@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -174,8 +175,32 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		return
 	}
 
-	marketData := fmt.Sprintf("Account: TotalAssets=%.2f, Cash=%.2f, MarketValue=%.2f",
-		accountFunds.TotalAssets, accountFunds.Cash, accountFunds.MarketValue)
+	var marketDataLines []string
+	marketDataLines = append(marketDataLines, "=== A股市场模拟数据 ===")
+	marketDataLines = append(marketDataLines, "")
+	marketDataLines = append(marketDataLines, "【账户概况】")
+	marketDataLines = append(marketDataLines, fmt.Sprintf("总资产: %.2f", accountFunds.TotalAssets))
+	marketDataLines = append(marketDataLines, fmt.Sprintf("可用资金: %.2f", accountFunds.Cash))
+	marketDataLines = append(marketDataLines, fmt.Sprintf("持仓市值: %.2f", accountFunds.MarketValue))
+	marketDataLines = append(marketDataLines, fmt.Sprintf("仓位比例: %.1f%%", accountFunds.MarketValue/accountFunds.TotalAssets*100))
+	marketDataLines = append(marketDataLines, "")
+	marketDataLines = append(marketDataLines, "【当前持仓】")
+	if len(positions) == 0 {
+		marketDataLines = append(marketDataLines, "无持仓")
+	} else {
+		for _, pos := range positions {
+			pnlPct := (pos.CurrentPrice - pos.AvgCost) / pos.AvgCost * 100
+			marketDataLines = append(marketDataLines, fmt.Sprintf("- %s.%s: 持有%d股, 成本价%.2f, 现价%.2f, 盈亏%.2f (%.2f%%)", 
+				pos.Market, pos.Code, pos.Quantity, pos.AvgCost, pos.CurrentPrice, pos.UnrealizedPnL, pnlPct))
+		}
+	}
+	marketDataLines = append(marketDataLines, "")
+	marketDataLines = append(marketDataLines, "【市场热点】")
+	marketDataLines = append(marketDataLines, "- 白酒板块: 近期表现平稳，贵州茅台(600519)在1500附近震荡")
+	marketDataLines = append(marketDataLines, "- 新能源: 持续调整，宁德时代(300750)估值回归合理区间")
+	marketDataLines = append(marketDataLines, "- 科技板块: AI概念活跃，可关注相关标的")
+
+	marketData := strings.Join(marketDataLines, "\n")
 
 	positionsJSON, _ := json.Marshal(positions)
 	accountJSON, _ := json.Marshal(accountFunds)
@@ -186,8 +211,9 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		return
 	}
 
+	log.Printf("Agent %s decision: %s %s %d @ %.2f - %s", worker.AgentID, decision.Action, decision.Code, decision.Quantity, decision.Price, decision.Reason)
+
 	if decision.Action == "HOLD" {
-		log.Printf("Agent %s decided to HOLD", worker.AgentID)
 		return
 	}
 
