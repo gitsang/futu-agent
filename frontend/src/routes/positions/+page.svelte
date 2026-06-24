@@ -35,7 +35,9 @@
 				comparison = a.code.localeCompare(b.code);
 				break;
 			case 'unrealized_pnl':
-				comparison = a.unrealized_pnl - b.unrealized_pnl;
+				const pnlA = (a.current_price - a.avg_cost) * a.quantity;
+				const pnlB = (b.current_price - b.avg_cost) * b.quantity;
+				comparison = pnlA - pnlB;
 				break;
 			case 'market_value':
 				comparison = (a.current_price * a.quantity) - (b.current_price * b.quantity);
@@ -44,7 +46,7 @@
 		return sortOrder === 'asc' ? comparison : -comparison;
 	}));
 
-	let totalPnl = $derived(filteredPositions.reduce((sum, p) => sum + p.unrealized_pnl, 0));
+	let totalPnl = $derived(filteredPositions.reduce((sum, p) => sum + ((p.current_price - p.avg_cost) * p.quantity), 0));
 	let totalMarketValue = $derived(filteredPositions.reduce((sum, p) => sum + (p.current_price * p.quantity), 0));
 	let totalCost = $derived(filteredPositions.reduce((sum, p) => sum + (p.avg_cost * p.quantity), 0));
 	let totalPnlPercent = $derived(totalCost > 0 ? (totalPnl / totalCost) * 100 : 0);
@@ -116,7 +118,7 @@
 		/>
 		<StatCard
 			label="持仓数量"
-			value={positions.length.toString()}
+			value={filteredPositions.length.toString()}
 			subtitle="只股票"
 			{loading}
 		/>
@@ -135,7 +137,7 @@
 							role="columnheader"
 							aria-sort={sortBy === 'stock_code' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'}
 						>
-							股票代码 {sortBy === 'stock_code' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+							股票 {sortBy === 'stock_code' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
 						</th>
 						<th class="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">市场</th>
 						<th class="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">持仓数量</th>
@@ -172,37 +174,38 @@
 							</td>
 						</tr>
 					{:else}
-					{#each sortedPositions as pos}
+				{#each sortedPositions as pos}
+						{@const pnl = (pos.current_price - pos.avg_cost) * pos.quantity}
 						{@const pnlPercent = pos.avg_cost > 0 ? ((pos.current_price - pos.avg_cost) / pos.avg_cost) * 100 : 0}
-						{@const marketValue = pos.current_price * pos.quantity}
 						<tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
 							<td class="px-4 py-3">
 								<div class="font-medium text-text-primary">{pos.code}</div>
+								<div class="text-xs text-text-muted">{pos.name}</div>
 							</td>
-								<td class="px-4 py-3">
-									<Badge variant="default">{pos.market}</Badge>
-								</td>
-								<td class="px-4 py-3 text-right font-mono text-sm text-text-primary">
-									{formatNumber(pos.quantity, 0)}
-								</td>
-								<td class="px-4 py-3 text-right font-mono text-sm text-text-secondary">
-									{formatCurrency(pos.avg_cost)}
-								</td>
-								<td class="px-4 py-3 text-right font-mono text-sm text-text-primary">
-									{formatCurrency(pos.current_price)}
-								</td>
-								<td class="px-4 py-3 text-right">
-									<span class={cn('font-mono text-sm font-medium', getPnlColor(pos.unrealized_pnl))}>
-										{pos.unrealized_pnl >= 0 ? '+' : ''}{formatCurrency(pos.unrealized_pnl)}
-									</span>
-								</td>
-								<td class="px-4 py-3 text-right">
-									<span class={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', getPnlBg(pos.unrealized_pnl), getPnlColor(pos.unrealized_pnl))}>
-										{pnlPercent >= 0 ? '+' : ''}{formatNumber(pnlPercent)}%
-									</span>
-								</td>
-							</tr>
-						{/each}
+							<td class="px-4 py-3">
+								<Badge variant="default">{pos.market}</Badge>
+							</td>
+							<td class="px-4 py-3 text-right font-mono text-sm text-text-primary">
+								{formatNumber(pos.quantity, 0)}
+							</td>
+							<td class="px-4 py-3 text-right font-mono text-sm text-text-secondary">
+								{formatCurrency(pos.avg_cost)}
+							</td>
+							<td class="px-4 py-3 text-right font-mono text-sm text-text-primary">
+								{formatCurrency(pos.current_price)}
+							</td>
+							<td class="px-4 py-3 text-right">
+								<span class={cn('font-mono text-sm font-medium', getPnlColor(pnl))}>
+									{pnl >= 0 ? '+' : ''}{formatCurrency(pnl)}
+								</span>
+							</td>
+							<td class="px-4 py-3 text-right">
+								<span class={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', getPnlBg(pnl), getPnlColor(pnl))}>
+									{pnlPercent >= 0 ? '+' : ''}{formatNumber(pnlPercent)}%
+								</span>
+							</td>
+						</tr>
+					{/each}
 					{/if}
 				</tbody>
 			</table>
