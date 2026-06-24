@@ -25,11 +25,11 @@
 	let filteredDecisions = $derived(
 		decisions
 			.filter(d => $selectedMarket === 'ALL' || d.market === $selectedMarket)
-			.filter(d => filter === 'all' || d.action.toLowerCase() === filter)
+			.filter(d => filter === 'all' || d.action?.toLowerCase() === filter)
 	);
 
 	function getActionVariant(action: string) {
-		switch (action.toLowerCase()) {
+		switch (action?.toLowerCase()) {
 			case 'buy': return 'success' as const;
 			case 'sell': return 'destructive' as const;
 			default: return 'default' as const;
@@ -37,7 +37,7 @@
 	}
 
 	function getActionLabel(action: string) {
-		switch (action.toLowerCase()) {
+		switch (action?.toLowerCase()) {
 			case 'buy': return '买入';
 			case 'sell': return '卖出';
 			default: return '持有';

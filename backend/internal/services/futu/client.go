@@ -368,6 +368,108 @@ func (c *Client) GetQuote(ctx context.Context, market, code string) (*Quote, err
 	}, nil
 }
 
+func (c *Client) GetOrders(ctx context.Context, market string) ([]Order, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	var result []Order
+
+	if market == "" || market == "ALL" {
+		seen := make(map[uint64]bool)
+		for _, accIDs := range c.accMap {
+			for _, accID := range accIDs {
+				if seen[accID] {
+					continue
+				}
+				seen[accID] = true
+
+				orders, err := client.GetOrderList(ctx, c.sdkClient, accID)
+				if err != nil {
+					log.Printf("Failed to get orders for accID %d: %v", accID, err)
+					continue
+				}
+
+				for _, o := range orders {
+					result = append(result, convertOrder(o))
+				}
+			}
+		}
+	} else {
+		accIDs := c.accMap[market]
+		if len(accIDs) == 0 {
+			return result, nil
+		}
+
+		for _, accID := range accIDs {
+			orders, err := client.GetOrderList(ctx, c.sdkClient, accID)
+			if err != nil {
+				log.Printf("Failed to get orders for accID %d: %v", accID, err)
+				continue
+			}
+
+			for _, o := range orders {
+				order := convertOrder(o)
+				if order.Market == market {
+					result = append(result, order)
+				}
+			}
+		}
+	}
+
+	return result, nil
+}
+
+func convertOrder(o client.Order) Order {
+	side := "BUY"
+	if o.TrdSide == 2 {
+		side = "SELL"
+	}
+
+	orderType := "NORMAL"
+	switch o.OrderType {
+	case 1:
+		orderType = "MARKET"
+	case 2:
+		orderType = "STOP"
+	}
+
+	status := "UNKNOWN"
+	switch o.OrderStatus {
+	case 1:
+		status = "PENDING"
+	case 2:
+		status = "SUBMITTED"
+	case 3:
+		status = "FILLED"
+	case 4:
+		status = "CANCELLED"
+	case 5:
+		status = "FAILED"
+	case 6:
+		status = "EXPIRED"
+	}
+
+	market := marketFromCode(o.Code)
+
+	return Order{
+		OrderID:    o.OrderIDEx,
+		Code:       o.Code,
+		Name:       o.Name,
+		Market:     market,
+		Side:       side,
+		OrderType:  orderType,
+		Status:     status,
+		Price:      o.Price,
+		Qty:        o.Qty,
+		FillQty:    o.FillQty,
+		FillPrice:  o.FillAvgPrice,
+		CreateTime: o.CreateTime,
+		UpdateTime: o.UpdateTime,
+		Remark:     o.LastErrMsg,
+	}
+}
+
 // marketFromCode determines market from stock code pattern:
 // CN: 6 digits starting with 6/0/3
 // HK: 5 digits starting with 0
@@ -415,6 +517,23 @@ type Quote struct {
 	TurnoverRate float64 `json:"turnover_rate"`
 	Amplitude    float64 `json:"amplitude"`
 	ChangePct    float64 `json:"change_pct"`
+}
+
+type Order struct {
+	OrderID      string  `json:"order_id"`
+	Code         string  `json:"code"`
+	Name         string  `json:"name"`
+	Market       string  `json:"market"`
+	Side         string  `json:"side"`
+	OrderType    string  `json:"order_type"`
+	Status       string  `json:"status"`
+	Price        float64 `json:"price"`
+	Qty          float64 `json:"qty"`
+	FillQty      float64 `json:"fill_qty"`
+	FillPrice    float64 `json:"fill_price"`
+	CreateTime   string  `json:"create_time"`
+	UpdateTime   string  `json:"update_time"`
+	Remark       string  `json:"remark"`
 }
 
 type OrderResult struct {

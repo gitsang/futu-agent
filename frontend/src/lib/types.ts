@@ -29,6 +29,23 @@ export interface Decision {
 	created_at: string;
 }
 
+export interface Order {
+	order_id: string;
+	code: string;
+	name: string;
+	market: string;
+	side: string;
+	order_type: string;
+	status: string;
+	price: number;
+	qty: number;
+	fill_qty: number;
+	fill_price: number;
+	create_time: string;
+	update_time: string;
+	remark: string;
+}
+
 export interface Agent {
 	id: string;
 	agent_id: string;

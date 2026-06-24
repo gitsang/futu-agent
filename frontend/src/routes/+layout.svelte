@@ -12,6 +12,7 @@
 		{ href: '/', label: '仪表盘', icon: '📊' },
 		{ href: '/decisions', label: '决策日志', icon: '🤖' },
 		{ href: '/positions', label: '持仓管理', icon: '📈' },
+		{ href: '/orders', label: '订单管理', icon: '📋' },
 		{ href: '/config', label: '系统配置', icon: '⚙️' }
 	];
 

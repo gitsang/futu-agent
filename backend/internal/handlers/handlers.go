@@ -70,6 +70,22 @@ func (h *Handler) GetPositions(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, positions)
 }
 
+func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	market := r.URL.Query().Get("market")
+
+	orders, err := h.futuClient.GetOrders(r.Context(), market)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch orders")
+		return
+	}
+
+	if orders == nil {
+		orders = []futu.Order{}
+	}
+
+	respondJSON(w, http.StatusOK, orders)
+}
+
 func (h *Handler) GetDecisions(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	limit := 50

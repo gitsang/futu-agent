@@ -59,6 +59,7 @@ func main() {
 		r.Get("/account/funds", handler.GetAccountFunds)
 		r.Get("/account/funds/all", handler.GetAllAccountFunds)
 		r.Get("/account/positions", handler.GetPositions)
+		r.Get("/account/orders", handler.GetOrders)
 
 		r.Get("/decisions", handler.GetDecisions)
 		r.Get("/decisions/{id}", handler.GetDecision)

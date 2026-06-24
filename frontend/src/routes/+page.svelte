@@ -182,9 +182,9 @@
 									<span class="font-medium text-text-primary">{decision.stock_code}</span>
 									<span class="text-xs text-text-muted">{decision.market}</span>
 									<Badge
-										variant={decision.action.toLowerCase() === 'buy' ? 'success' : decision.action.toLowerCase() === 'sell' ? 'destructive' : 'default'}
+										variant={decision.action?.toLowerCase() === 'buy' ? 'success' : decision.action?.toLowerCase() === 'sell' ? 'destructive' : 'default'}
 									>
-										{decision.action.toLowerCase() === 'buy' ? '买入' : decision.action.toLowerCase() === 'sell' ? '卖出' : '持有'}
+										{decision.action?.toLowerCase() === 'buy' ? '买入' : decision.action?.toLowerCase() === 'sell' ? '卖出' : '持有'}
 									</Badge>
 								</div>
 								<Badge variant={decision.executed ? 'success' : 'warning'}>
