@@ -54,14 +54,18 @@ func Migrate(db *sql.DB) error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS account_funds (
 			id SERIAL PRIMARY KEY,
+			market VARCHAR(10) NOT NULL DEFAULT 'ALL',
+			currency VARCHAR(10) NOT NULL DEFAULT 'CNY',
 			total_assets DECIMAL(15, 4),
 			cash DECIMAL(15, 4),
 			market_value DECIMAL(15, 4),
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(market)
 		)`,
 		`CREATE TABLE IF NOT EXISTS agent_configs (
 			id SERIAL PRIMARY KEY,
-			agent_id VARCHAR(50) UNIQUE NOT NULL,
+			agent_id VARCHAR(50) NOT NULL,
+			market VARCHAR(10) NOT NULL DEFAULT 'CN',
 			name VARCHAR(100),
 			description TEXT,
 			llm_model VARCHAR(100),
@@ -70,7 +74,8 @@ func Migrate(db *sql.DB) error {
 			risk_parameters JSONB,
 			enabled BOOLEAN DEFAULT TRUE,
 			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(agent_id, market)
 		)`,
 		`CREATE TABLE IF NOT EXISTS system_configs (
 			key VARCHAR(100) PRIMARY KEY,
@@ -83,6 +88,31 @@ func Migrate(db *sql.DB) error {
 	for _, migration := range migrations {
 		if _, err := db.Exec(migration); err != nil {
 			return fmt.Errorf("failed to execute migration: %w", err)
+		}
+	}
+
+	// Add market column to existing tables if not exists
+	alterMigrations := []string{
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='account_funds' AND column_name='market') THEN
+				ALTER TABLE account_funds ADD COLUMN market VARCHAR(10) NOT NULL DEFAULT 'ALL';
+			END IF;
+		END $$`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='account_funds' AND column_name='currency') THEN
+				ALTER TABLE account_funds ADD COLUMN currency VARCHAR(10) NOT NULL DEFAULT 'CNY';
+			END IF;
+		END $$`,
+		`DO $$ BEGIN
+			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='agent_configs' AND column_name='market') THEN
+				ALTER TABLE agent_configs ADD COLUMN market VARCHAR(10) NOT NULL DEFAULT 'CN';
+			END IF;
+		END $$`,
+	}
+
+	for _, migration := range alterMigrations {
+		if _, err := db.Exec(migration); err != nil {
+			return fmt.Errorf("failed to execute alter migration: %w", err)
 		}
 	}
 

@@ -32,6 +32,7 @@ export interface Decision {
 export interface Agent {
 	id: string;
 	agent_id: string;
+	market: string;
 	name: string;
 	description: string;
 	llm_model: string;

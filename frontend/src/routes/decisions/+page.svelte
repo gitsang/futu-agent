@@ -4,6 +4,7 @@
 	import type { Decision } from '$lib/types';
 	import { formatDate, cn } from '$lib/utils';
 	import { Card, Badge, LoadingSpinner, Button } from '$lib/components';
+	import { selectedMarket } from '$lib/stores';
 
 	let decisions = $state<Decision[]>([]);
 	let loading = $state(true);
@@ -22,9 +23,9 @@
 	});
 
 	let filteredDecisions = $derived(
-		filter === 'all'
-			? decisions
-			: decisions.filter((d) => d.action.toLowerCase() === filter)
+		decisions
+			.filter(d => $selectedMarket === 'ALL' || d.market === $selectedMarket)
+			.filter(d => filter === 'all' || d.action.toLowerCase() === filter)
 	);
 
 	function getActionVariant(action: string) {

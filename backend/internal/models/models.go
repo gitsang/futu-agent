@@ -34,6 +34,8 @@ type Position struct {
 
 type AccountFunds struct {
 	ID           int64     `json:"id"`
+	Market       string    `json:"market"`
+	Currency     string    `json:"currency"`
 	TotalAssets  float64   `json:"total_assets"`
 	Cash         float64   `json:"cash"`
 	MarketValue  float64   `json:"market_value"`
@@ -43,6 +45,7 @@ type AccountFunds struct {
 type AgentConfig struct {
 	ID              int64           `json:"id"`
 	AgentID         string          `json:"agent_id"`
+	Market          string          `json:"market"`
 	Name            string          `json:"name"`
 	Description     string          `json:"description"`
 	LLMModel        string          `json:"llm_model"`
@@ -92,6 +95,7 @@ type DecisionResponse struct {
 type AgentConfigResponse struct {
 	ID              int64  `json:"id"`
 	AgentID         string `json:"agent_id"`
+	Market          string `json:"market"`
 	Name            string `json:"name"`
 	Description     string `json:"description"`
 	LLMModel        string `json:"llm_model"`
@@ -102,6 +106,7 @@ type AgentConfigResponse struct {
 
 type CreateAgentRequest struct {
 	AgentID         string          `json:"agent_id"`
+	Market          string          `json:"market"`
 	Name            string          `json:"name"`
 	Description     string          `json:"description"`
 	LLMModel        string          `json:"llm_model"`

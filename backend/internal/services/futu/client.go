@@ -170,7 +170,7 @@ func (c *Client) GetAllAccountFunds(ctx context.Context) ([]AccountFunds, error)
 
 		funds, err := client.GetFunds(ctx, c.sdkClient, accID)
 		if err != nil {
-			log.Printf("Failed to get funds for %s: %v", market, err)
+			log.Printf("Failed to get funds for %s (accID: %d): %v", market, accID, err)
 			continue
 		}
 
@@ -199,33 +199,52 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 		return nil, fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	accID := c.accID
-	if id, ok := c.accMap[market]; ok {
-		accID = id
-	}
-
-	positions, err := client.GetPositionList(ctx, c.sdkClient, accID)
-	if err != nil {
-		return nil, fmt.Errorf("GetPositionList failed: %w", err)
-	}
-
 	var result []Position
-	for _, pos := range positions {
-		marketStr := marketFromCode(pos.Code)
-		
-		if market != "" && market != "ALL" && marketStr != market {
-			continue
+	
+	if market == "" || market == "ALL" {
+		for _, accID := range c.accMap {
+			positions, err := client.GetPositionList(ctx, c.sdkClient, accID)
+			if err != nil {
+				log.Printf("Failed to get positions for accID %d: %v", accID, err)
+				continue
+			}
+
+			for _, pos := range positions {
+				marketStr := marketFromCode(pos.Code)
+				result = append(result, Position{
+					Code:          pos.Code,
+					Market:        marketStr,
+					Name:          pos.Name,
+					Quantity:      int(pos.Quantity),
+					AvgCost:       pos.CostPrice,
+					CurrentPrice:  pos.CurPrice,
+					UnrealizedPnL: pos.UnrealizedPL,
+				})
+			}
+		}
+	} else {
+		accID := c.accID
+		if id, ok := c.accMap[market]; ok {
+			accID = id
 		}
 
-		result = append(result, Position{
-			Code:          pos.Code,
-			Market:        marketStr,
-			Name:          pos.Name,
-			Quantity:      int(pos.Quantity),
-			AvgCost:       pos.CostPrice,
-			CurrentPrice:  pos.CurPrice,
-			UnrealizedPnL: pos.UnrealizedPL,
-		})
+		positions, err := client.GetPositionList(ctx, c.sdkClient, accID)
+		if err != nil {
+			return nil, fmt.Errorf("GetPositionList failed: %w", err)
+		}
+
+		for _, pos := range positions {
+			marketStr := marketFromCode(pos.Code)
+			result = append(result, Position{
+				Code:          pos.Code,
+				Market:        marketStr,
+				Name:          pos.Name,
+				Quantity:      int(pos.Quantity),
+				AvgCost:       pos.CostPrice,
+				CurrentPrice:  pos.CurPrice,
+				UnrealizedPnL: pos.UnrealizedPL,
+			})
+		}
 	}
 
 	return result, nil

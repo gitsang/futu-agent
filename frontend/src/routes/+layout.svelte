@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import { cn } from '$lib/utils';
+	import { selectedMarket, MARKETS } from '$lib/stores';
 	import StatusIndicator from '$lib/components/StatusIndicator.svelte';
 	import type { Snippet } from 'svelte';
 	import '../app.css';
@@ -81,6 +82,22 @@
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 				</svg>
 			</button>
+
+			<div class="flex items-center gap-2">
+				{#each MARKETS as market}
+					<button
+						class={cn(
+							'rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
+							$selectedMarket === market.id
+								? 'bg-accent text-white'
+								: 'text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+						)}
+						onclick={() => selectedMarket.set(market.id)}
+					>
+						{market.icon} {market.label}
+					</button>
+				{/each}
+			</div>
 
 			<div class="flex items-center gap-4">
 				<div class="hidden sm:flex items-center gap-2 rounded-lg bg-surface-elevated px-3 py-2">

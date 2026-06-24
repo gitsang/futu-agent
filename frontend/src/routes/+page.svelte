@@ -4,20 +4,13 @@
 	import type { AccountFunds, Decision, Position } from '$lib/types';
 	import { formatCurrency, formatDate, cn } from '$lib/utils';
 	import { StatCard, Card, Badge, LoadingSpinner, Button } from '$lib/components';
+	import { selectedMarket } from '$lib/stores';
 
 	let allFunds = $state<AccountFunds[]>([]);
 	let positions = $state<Position[]>([]);
 	let decisions = $state<Decision[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let selectedMarket = $state<string>('ALL');
-
-	const markets = [
-		{ id: 'ALL', label: '全部', icon: '🌍' },
-		{ id: 'CN', label: 'A股', icon: '🇨🇳' },
-		{ id: 'HK', label: '港股', icon: '🇭🇰' },
-		{ id: 'US', label: '美股', icon: '🇺🇸' }
-	];
 
 	onMount(async () => {
 		try {
@@ -37,7 +30,7 @@
 	});
 
 	let filteredFunds = $derived(
-		selectedMarket === 'ALL'
+		$selectedMarket === 'ALL'
 			? allFunds.reduce((acc, f) => ({
 					market: 'ALL',
 					currency: 'CNY',
@@ -45,13 +38,19 @@
 					cash: acc.cash + f.cash,
 					market_value: acc.market_value + f.market_value
 				}), { market: 'ALL', currency: 'CNY', total_assets: 0, cash: 0, market_value: 0 })
-			: allFunds.find(f => f.market === selectedMarket) || { market: selectedMarket, currency: 'CNY', total_assets: 0, cash: 0, market_value: 0 }
+			: allFunds.find(f => f.market === $selectedMarket) || { market: $selectedMarket, currency: 'CNY', total_assets: 0, cash: 0, market_value: 0 }
 	);
 
 	let filteredPositions = $derived(
-		selectedMarket === 'ALL'
+		$selectedMarket === 'ALL'
 			? positions
-			: positions.filter(p => p.market === selectedMarket)
+			: positions.filter(p => p.market === $selectedMarket)
+	);
+
+	let filteredDecisions = $derived(
+		$selectedMarket === 'ALL'
+			? decisions
+			: decisions.filter(d => d.market === $selectedMarket)
 	);
 
 	let totalPnl = $derived(
@@ -98,22 +97,6 @@
 			</div>
 		</Card>
 	{/if}
-
-	<div class="flex gap-2">
-		{#each markets as market}
-			<button
-				class={cn(
-					'rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200',
-					selectedMarket === market.id
-						? 'bg-accent text-white'
-						: 'bg-surface-elevated text-text-secondary hover:text-text-primary hover:bg-surface-hover'
-				)}
-				onclick={() => selectedMarket = market.id}
-			>
-				{market.icon} {market.label}
-			</button>
-		{/each}
-	</div>
 
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<StatCard
@@ -188,11 +171,11 @@
 				<div class="flex justify-center py-8">
 					<LoadingSpinner />
 				</div>
-			{:else if decisions.length === 0}
+			{:else if filteredDecisions.length === 0}
 				<div class="py-8 text-center text-text-muted">暂无决策记录</div>
 			{:else}
 				<div class="space-y-3">
-					{#each decisions as decision}
+					{#each filteredDecisions as decision}
 						<div class="rounded-lg bg-surface-elevated p-3 transition-colors hover:bg-surface-hover">
 							<div class="flex items-center justify-between mb-1">
 								<div class="flex items-center gap-2">

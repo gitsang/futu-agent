@@ -4,6 +4,7 @@
 	import type { Agent, SystemConfig, SystemStatus } from '$lib/types';
 	import { cn } from '$lib/utils';
 	import { Card, Badge, LoadingSpinner, Button, StatusIndicator } from '$lib/components';
+	import { selectedMarket } from '$lib/stores';
 
 	let status = $state<SystemStatus | null>(null);
 	let agents = $state<Agent[]>([]);
@@ -30,6 +31,12 @@
 		}
 	});
 
+	let filteredAgents = $derived(
+		$selectedMarket === 'ALL'
+			? agents
+			: agents.filter(a => a.market === $selectedMarket)
+	);
+
 	async function toggleAgent(agent: Agent) {
 		try {
 			await api.updateAgent(agent.id, { enabled: !agent.enabled });
@@ -54,6 +61,7 @@
 		try {
 			const created = await api.createAgent({
 				agent_id: newAgent.name.toLowerCase().replace(/\s+/g, '_'),
+				market: $selectedMarket === 'ALL' ? 'CN' : $selectedMarket,
 				...newAgent
 			});
 			agents = [...agents, created];
@@ -245,11 +253,11 @@
 			<div class="flex justify-center py-8">
 				<LoadingSpinner />
 			</div>
-		{:else if agents.length === 0}
+		{:else if filteredAgents.length === 0}
 			<div class="py-8 text-center text-text-muted">暂无代理配置</div>
 		{:else}
 			<div class="space-y-3">
-				{#each agents as agent}
+				{#each filteredAgents as agent}
 					<div class="flex items-center justify-between rounded-lg bg-surface-elevated p-4 transition-colors hover:bg-surface-hover">
 						<div class="flex items-center gap-4">
 							<div class={cn(

@@ -143,11 +143,20 @@ func (h *Handler) GetDecision(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(`
-		SELECT id, agent_id, name, description, llm_model, llm_endpoint, trading_strategy, enabled, created_at, updated_at
+	market := r.URL.Query().Get("market")
+
+	query := `
+		SELECT id, agent_id, market, name, description, llm_model, llm_endpoint, trading_strategy, enabled, created_at, updated_at
 		FROM agent_configs
-		ORDER BY created_at DESC
-	`)
+	`
+	var args []interface{}
+	if market != "" && market != "ALL" {
+		query += " WHERE market = $1"
+		args = append(args, market)
+	}
+	query += " ORDER BY created_at DESC"
+
+	rows, err := h.db.Query(query, args...)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch agents")
 		return
@@ -157,13 +166,14 @@ func (h *Handler) GetAgents(w http.ResponseWriter, r *http.Request) {
 	var agents []models.AgentConfigResponse
 	for rows.Next() {
 		var a models.AgentConfig
-		if err := rows.Scan(&a.ID, &a.AgentID, &a.Name, &a.Description, &a.LLMModel, &a.LLMEndpoint, &a.TradingStrategy, &a.Enabled, &a.CreatedAt, &a.UpdatedAt); err != nil {
+		if err := rows.Scan(&a.ID, &a.AgentID, &a.Market, &a.Name, &a.Description, &a.LLMModel, &a.LLMEndpoint, &a.TradingStrategy, &a.Enabled, &a.CreatedAt, &a.UpdatedAt); err != nil {
 			respondError(w, http.StatusInternalServerError, "Failed to scan agent")
 			return
 		}
 		agents = append(agents, models.AgentConfigResponse{
 			ID:              a.ID,
 			AgentID:         a.AgentID,
+			Market:          a.Market,
 			Name:            a.Name,
 			Description:     a.Description,
 			LLMModel:        a.LLMModel,
@@ -192,12 +202,16 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Market == "" {
+		req.Market = "CN"
+	}
+
 	var id int64
 	err := h.db.QueryRow(`
-		INSERT INTO agent_configs (agent_id, name, description, llm_model, llm_endpoint, trading_strategy, risk_parameters)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO agent_configs (agent_id, market, name, description, llm_model, llm_endpoint, trading_strategy, risk_parameters)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING id
-	`, req.AgentID, req.Name, req.Description, req.LLMModel, req.LLMEndpoint, req.TradingStrategy, req.RiskParameters).Scan(&id)
+	`, req.AgentID, req.Market, req.Name, req.Description, req.LLMModel, req.LLMEndpoint, req.TradingStrategy, req.RiskParameters).Scan(&id)
 
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to create agent")
@@ -207,6 +221,7 @@ func (h *Handler) CreateAgent(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusCreated, map[string]interface{}{
 		"id":      id,
 		"agent_id": req.AgentID,
+		"market":  req.Market,
 	})
 }
 
@@ -350,13 +365,19 @@ func (h *Handler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
+	market := r.URL.Query().Get("market")
+
 	dbStatus := "connected"
 	if err := h.db.Ping(); err != nil {
 		dbStatus = "disconnected"
 	}
 
 	var activeAgents int
-	h.db.QueryRow("SELECT COUNT(*) FROM agent_configs WHERE enabled = TRUE").Scan(&activeAgents)
+	if market != "" && market != "ALL" {
+		h.db.QueryRow("SELECT COUNT(*) FROM agent_configs WHERE enabled = TRUE AND market = $1", market).Scan(&activeAgents)
+	} else {
+		h.db.QueryRow("SELECT COUNT(*) FROM agent_configs WHERE enabled = TRUE").Scan(&activeAgents)
+	}
 
 	respondJSON(w, http.StatusOK, models.StatusResponse{
 		ServerStatus:    "running",

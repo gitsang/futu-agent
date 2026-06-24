@@ -4,6 +4,7 @@
 	import type { Position } from '$lib/types';
 	import { formatCurrency, formatNumber, cn } from '$lib/utils';
 	import { Card, StatCard, Badge, LoadingSpinner, Button } from '$lib/components';
+	import { selectedMarket } from '$lib/stores';
 
 	let positions = $state<Position[]>([]);
 	let loading = $state(true);
@@ -21,7 +22,13 @@
 		}
 	});
 
-	let sortedPositions = $derived([...positions].sort((a, b) => {
+	let filteredPositions = $derived(
+		$selectedMarket === 'ALL'
+			? positions
+			: positions.filter(p => p.market === $selectedMarket)
+	);
+
+	let sortedPositions = $derived([...filteredPositions].sort((a, b) => {
 		let comparison = 0;
 		switch (sortBy) {
 			case 'stock_code':
@@ -37,9 +44,9 @@
 		return sortOrder === 'asc' ? comparison : -comparison;
 	}));
 
-	let totalPnl = $derived(positions.reduce((sum, p) => sum + p.unrealized_pnl, 0));
-	let totalMarketValue = $derived(positions.reduce((sum, p) => sum + (p.current_price * p.quantity), 0));
-	let totalCost = $derived(positions.reduce((sum, p) => sum + (p.avg_cost * p.quantity), 0));
+	let totalPnl = $derived(filteredPositions.reduce((sum, p) => sum + p.unrealized_pnl, 0));
+	let totalMarketValue = $derived(filteredPositions.reduce((sum, p) => sum + (p.current_price * p.quantity), 0));
+	let totalCost = $derived(filteredPositions.reduce((sum, p) => sum + (p.avg_cost * p.quantity), 0));
 	let totalPnlPercent = $derived(totalCost > 0 ? (totalPnl / totalCost) * 100 : 0);
 
 	function toggleSort(column: typeof sortBy) {
