@@ -26,7 +26,7 @@ var sideMap = map[string]constant.TrdSide{
 type Client struct {
 	sdkClient *client.Client
 	accID     uint64
-	accMap    map[string]uint64
+	accMap    map[string][]uint64
 	connected bool
 	mu        sync.RWMutex
 }
@@ -42,7 +42,7 @@ func NewClient(host string, port int) (*Client, error) {
 
 	c := &Client{
 		sdkClient: sdkClient,
-		accMap:    make(map[string]uint64),
+		accMap:    make(map[string][]uint64),
 		connected: true,
 	}
 
@@ -77,11 +77,11 @@ func (c *Client) discoverAccounts() error {
 		for _, market := range acc.TrdMarketAuthList {
 			switch constant.TrdMarket(market) {
 			case constant.TrdMarket_HK:
-				c.accMap["HK"] = acc.AccID
+				c.accMap["HK"] = append(c.accMap["HK"], acc.AccID)
 			case constant.TrdMarket_US:
-				c.accMap["US"] = acc.AccID
+				c.accMap["US"] = append(c.accMap["US"], acc.AccID)
 			case constant.TrdMarket_CN:
-				c.accMap["CN"] = acc.AccID
+				c.accMap["CN"] = append(c.accMap["CN"], acc.AccID)
 			}
 		}
 	}
@@ -129,14 +129,21 @@ func (c *Client) GetAccountFunds(ctx context.Context, market string) (*AccountFu
 		return nil, fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	accID := c.accID
-	if id, ok := c.accMap[market]; ok {
-		accID = id
+	accIDs := c.accMap[market]
+	if len(accIDs) == 0 {
+		accIDs = []uint64{c.accID}
 	}
 
-	funds, err := client.GetFunds(ctx, c.sdkClient, accID)
-	if err != nil {
-		return nil, fmt.Errorf("GetFunds failed: %w", err)
+	var totalAssets, totalCash, totalMarketValue float64
+	for _, accID := range accIDs {
+		funds, err := client.GetFunds(ctx, c.sdkClient, accID)
+		if err != nil {
+			log.Printf("Failed to get funds for accID %d: %v", accID, err)
+			continue
+		}
+		totalAssets += funds.TotalAssets
+		totalCash += funds.Cash
+		totalMarketValue += funds.MarketVal
 	}
 
 	currency := "CNY"
@@ -150,9 +157,9 @@ func (c *Client) GetAccountFunds(ctx context.Context, market string) (*AccountFu
 	return &AccountFunds{
 		Market:      market,
 		Currency:    currency,
-		TotalAssets: funds.TotalAssets,
-		Cash:        funds.Cash,
-		MarketValue: funds.MarketVal,
+		TotalAssets: totalAssets,
+		Cash:        totalCash,
+		MarketValue: totalMarketValue,
 	}, nil
 }
 
@@ -163,15 +170,21 @@ func (c *Client) GetAllAccountFunds(ctx context.Context) ([]AccountFunds, error)
 
 	var result []AccountFunds
 	for _, market := range []string{"CN", "HK", "US"} {
-		accID := c.accID
-		if id, ok := c.accMap[market]; ok {
-			accID = id
+		accIDs := c.accMap[market]
+		if len(accIDs) == 0 {
+			continue
 		}
 
-		funds, err := client.GetFunds(ctx, c.sdkClient, accID)
-		if err != nil {
-			log.Printf("Failed to get funds for %s (accID: %d): %v", market, accID, err)
-			continue
+		var totalAssets, totalCash, totalMarketValue float64
+		for _, accID := range accIDs {
+			funds, err := client.GetFunds(ctx, c.sdkClient, accID)
+			if err != nil {
+				log.Printf("Failed to get funds for %s (accID: %d): %v", market, accID, err)
+				continue
+			}
+			totalAssets += funds.TotalAssets
+			totalCash += funds.Cash
+			totalMarketValue += funds.MarketVal
 		}
 
 		currency := "CNY"
@@ -185,9 +198,9 @@ func (c *Client) GetAllAccountFunds(ctx context.Context) ([]AccountFunds, error)
 		result = append(result, AccountFunds{
 			Market:      market,
 			Currency:    currency,
-			TotalAssets: funds.TotalAssets,
-			Cash:        funds.Cash,
-			MarketValue: funds.MarketVal,
+			TotalAssets: totalAssets,
+			Cash:        totalCash,
+			MarketValue: totalMarketValue,
 		})
 	}
 
@@ -202,7 +215,41 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 	var result []Position
 	
 	if market == "" || market == "ALL" {
-		for _, accID := range c.accMap {
+		seen := make(map[uint64]bool)
+		for _, accIDs := range c.accMap {
+			for _, accID := range accIDs {
+				if seen[accID] {
+					continue
+				}
+				seen[accID] = true
+				
+				positions, err := client.GetPositionList(ctx, c.sdkClient, accID)
+				if err != nil {
+					log.Printf("Failed to get positions for accID %d: %v", accID, err)
+					continue
+				}
+
+				for _, pos := range positions {
+					marketStr := marketFromCode(pos.Code)
+					result = append(result, Position{
+						Code:          pos.Code,
+						Market:        marketStr,
+						Name:          pos.Name,
+						Quantity:      int(pos.Quantity),
+						AvgCost:       pos.CostPrice,
+						CurrentPrice:  pos.CurPrice,
+						UnrealizedPnL: pos.UnrealizedPL,
+					})
+				}
+			}
+		}
+	} else {
+		accIDs := c.accMap[market]
+		if len(accIDs) == 0 {
+			accIDs = []uint64{c.accID}
+		}
+
+		for _, accID := range accIDs {
 			positions, err := client.GetPositionList(ctx, c.sdkClient, accID)
 			if err != nil {
 				log.Printf("Failed to get positions for accID %d: %v", accID, err)
@@ -222,29 +269,6 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 				})
 			}
 		}
-	} else {
-		accID := c.accID
-		if id, ok := c.accMap[market]; ok {
-			accID = id
-		}
-
-		positions, err := client.GetPositionList(ctx, c.sdkClient, accID)
-		if err != nil {
-			return nil, fmt.Errorf("GetPositionList failed: %w", err)
-		}
-
-		for _, pos := range positions {
-			marketStr := marketFromCode(pos.Code)
-			result = append(result, Position{
-				Code:          pos.Code,
-				Market:        marketStr,
-				Name:          pos.Name,
-				Quantity:      int(pos.Quantity),
-				AvgCost:       pos.CostPrice,
-				CurrentPrice:  pos.CurPrice,
-				UnrealizedPnL: pos.UnrealizedPL,
-			})
-		}
 	}
 
 	return result, nil
@@ -255,10 +279,11 @@ func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, pric
 		return "", fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	accID := c.accID
-	if id, ok := c.accMap[market]; ok {
-		accID = id
+	accIDs := c.accMap[market]
+	if len(accIDs) == 0 {
+		accIDs = []uint64{c.accID}
 	}
+	accID := accIDs[0]
 
 	trdMarket, ok := marketMap[market]
 	if !ok {
