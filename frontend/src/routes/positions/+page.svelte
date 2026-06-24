@@ -32,7 +32,7 @@
 		let comparison = 0;
 		switch (sortBy) {
 			case 'stock_code':
-				comparison = a.stock_code.localeCompare(b.stock_code);
+				comparison = a.code.localeCompare(b.code);
 				break;
 			case 'unrealized_pnl':
 				comparison = a.unrealized_pnl - b.unrealized_pnl;
@@ -172,13 +172,13 @@
 							</td>
 						</tr>
 					{:else}
-						{#each sortedPositions as pos}
-							{@const pnlPercent = pos.avg_cost > 0 ? ((pos.current_price - pos.avg_cost) / pos.avg_cost) * 100 : 0}
-							{@const marketValue = pos.current_price * pos.quantity}
-							<tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
-								<td class="px-4 py-3">
-									<div class="font-medium text-text-primary">{pos.stock_code}</div>
-								</td>
+					{#each sortedPositions as pos}
+						{@const pnlPercent = pos.avg_cost > 0 ? ((pos.current_price - pos.avg_cost) / pos.avg_cost) * 100 : 0}
+						{@const marketValue = pos.current_price * pos.quantity}
+						<tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
+							<td class="px-4 py-3">
+								<div class="font-medium text-text-primary">{pos.code}</div>
+							</td>
 								<td class="px-4 py-3">
 									<Badge variant="default">{pos.market}</Badge>
 								</td>
