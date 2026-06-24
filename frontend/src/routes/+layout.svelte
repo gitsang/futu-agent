@@ -3,6 +3,7 @@
 	import { cn } from '$lib/utils';
 	import StatusIndicator from '$lib/components/StatusIndicator.svelte';
 	import type { Snippet } from 'svelte';
+	import '../app.css';
 
 	let { children }: { children: Snippet } = $props();
 
