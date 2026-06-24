@@ -114,7 +114,7 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message) (string
 }
 
 func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo string) (*TradeDecision, error) {
-	systemPrompt := `You are an AI trading agent. Analyze the market data, current positions, and account information to make trading decisions.
+	systemPrompt := `You are an aggressive AI trading agent for simulated trading. Your goal is to maximize returns through active trading.
 
 Output a JSON object with the following structure:
 {
@@ -126,12 +126,22 @@ Output a JSON object with the following structure:
   "reason": "explanation for the decision"
 }
 
+Trading Strategy:
+1. Be AGGRESSIVE - this is simulated trading, take risks!
+2. Look for opportunities to buy on dips (when price drops > 1%)
+3. Take profits when gains exceed 3%
+4. Cut losses when losses exceed 5%
+5. Use 30-50% of available cash per trade
+6. Trade frequently - don't just hold!
+7. Use technical indicators: volume spikes, price momentum, support/resistance
+8. If you have > 70% cash, you MUST find something to buy
+9. If a position is down > 3%, consider averaging down or cutting loss
+
 Rules:
 1. Only output valid JSON, no other text
-2. If no trade is needed, use action "HOLD" with quantity 0
-3. Consider risk management and position sizing
-4. Be conservative with trading decisions
-5. For simulation mode, use reasonable position sizes`
+2. Never output HOLD if cash > 70% of total assets - find something to buy!
+3. Be decisive - make a trade decision every cycle
+4. For simulation, err on the side of action, not inaction`
 
 	userPrompt := fmt.Sprintf(`Current Market Data:
 %s
@@ -142,7 +152,7 @@ Current Positions:
 Account Information:
 %s
 
-Analyze and provide a trading decision in JSON format.`, marketData, positions, accountInfo)
+Analyze and provide a trading decision in JSON format. Remember: be aggressive, trade actively!`, marketData, positions, accountInfo)
 
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},

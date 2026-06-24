@@ -295,6 +295,21 @@ func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, pric
 		return "", fmt.Errorf("unsupported side: %s", side)
 	}
 
+	var secMarket constant.TrdSecMarket
+	if market == "CN" {
+		if len(code) == 6 {
+			if code[0] == '6' {
+				secMarket = constant.TrdSecMarket_CN_SH
+			} else {
+				secMarket = constant.TrdSecMarket_CN_SZ
+			}
+		}
+	} else if market == "HK" {
+		secMarket = constant.TrdSecMarket_HK
+	} else if market == "US" {
+		secMarket = constant.TrdSecMarket_US
+	}
+
 	result, err := client.PlaceOrder(
 		ctx,
 		c.sdkClient,
@@ -305,7 +320,7 @@ func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, pric
 		constant.OrderType_Normal,
 		price,
 		float64(quantity),
-		0,
+		secMarket,
 	)
 	if err != nil {
 		return "", fmt.Errorf("PlaceOrder failed: %w", err)
@@ -314,6 +329,43 @@ func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, pric
 	orderID := fmt.Sprintf("%d", result.OrderID)
 	log.Printf("Order placed: %s %s %s %d @ %.2f (OrderID: %s)", side, market, code, quantity, price, orderID)
 	return orderID, nil
+}
+
+func (c *Client) GetQuote(ctx context.Context, market, code string) (*Quote, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	marketConst, ok := marketMap[market]
+	if !ok {
+		return nil, fmt.Errorf("unsupported market: %s", market)
+	}
+
+	sdkQuote, err := client.GetQuote(ctx, c.sdkClient, constant.Market(marketConst), code)
+	if err != nil {
+		return nil, fmt.Errorf("GetQuote failed: %w", err)
+	}
+
+	changePct := 0.0
+	if sdkQuote.LastClose > 0 {
+		changePct = (sdkQuote.Price - sdkQuote.LastClose) / sdkQuote.LastClose * 100
+	}
+
+	return &Quote{
+		Code:         code,
+		Market:       market,
+		Name:         sdkQuote.Name,
+		Price:        sdkQuote.Price,
+		Open:         sdkQuote.Open,
+		High:         sdkQuote.High,
+		Low:          sdkQuote.Low,
+		LastClose:    sdkQuote.LastClose,
+		Volume:       sdkQuote.Volume,
+		Turnover:     sdkQuote.Turnover,
+		TurnoverRate: sdkQuote.TurnoverRate,
+		Amplitude:    sdkQuote.Amplitude,
+		ChangePct:    changePct,
+	}, nil
 }
 
 // marketFromCode determines market from stock code pattern:
@@ -350,16 +402,19 @@ func marketFromCode(code string) string {
 }
 
 type Quote struct {
-	Code       string
-	Market     string
-	Price      float64
-	High       float64
-	Low        float64
-	Open       float64
-	Close      float64
-	Volume     int64
-	Turnover   float64
-	UpdateTime time.Time
+	Code         string  `json:"code"`
+	Market       string  `json:"market"`
+	Name         string  `json:"name"`
+	Price        float64 `json:"price"`
+	Open         float64 `json:"open"`
+	High         float64 `json:"high"`
+	Low          float64 `json:"low"`
+	LastClose    float64 `json:"last_close"`
+	Volume       int64   `json:"volume"`
+	Turnover     float64 `json:"turnover"`
+	TurnoverRate float64 `json:"turnover_rate"`
+	Amplitude    float64 `json:"amplitude"`
+	ChangePct    float64 `json:"change_pct"`
 }
 
 type OrderResult struct {

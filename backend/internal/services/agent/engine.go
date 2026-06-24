@@ -157,7 +157,7 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		marketDataLines = append(marketDataLines, fmt.Sprintf("仓位比例: %.1f%%", accountFunds.MarketValue/accountFunds.TotalAssets*100))
 	}
 	marketDataLines = append(marketDataLines, "")
-	marketDataLines = append(marketDataLines, "【当前持仓】")
+	marketDataLines = append(marketDataLines, "【当前持仓及行情】")
 	if len(positions) == 0 {
 		marketDataLines = append(marketDataLines, "无持仓")
 	} else {
@@ -168,6 +168,12 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 			}
 			marketDataLines = append(marketDataLines, fmt.Sprintf("- %s (%s): 持有%d股, 成本价%.2f, 现价%.2f, 盈亏%.2f%%", 
 				pos.Name, pos.Code, pos.Quantity, pos.AvgCost, pos.CurrentPrice, pnlPct))
+
+			quote, err := e.futuClient.GetQuote(ctx, market, pos.Code)
+			if err == nil {
+				marketDataLines = append(marketDataLines, fmt.Sprintf("  行情: 今开%.2f 最高%.2f 最低%.2f 昨收%.2f 涨跌幅%.2f%% 振幅%.2f%% 换手率%.2f%% 成交量%d 成交额%.2f", 
+					quote.Open, quote.High, quote.Low, quote.LastClose, quote.ChangePct, quote.Amplitude, quote.TurnoverRate, quote.Volume, quote.Turnover))
+			}
 		}
 	}
 
@@ -188,7 +194,16 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		return
 	}
 
-	savedDecision := e.store.SaveDecision(store.TradeDecision{
+	if e.tradingEnabled {
+		orderID, err := e.futuClient.PlaceOrder(ctx, decision.Market, decision.Code, decision.Action, decision.Price, decision.Quantity)
+		if err != nil {
+			log.Printf("Failed to execute trade: %v", err)
+			return
+		}
+		log.Printf("Trade executed successfully, order ID: %s", orderID)
+	}
+
+	e.store.SaveDecision(store.TradeDecision{
 		AgentID:   worker.AgentID,
 		StockCode: decision.Code,
 		Market:    decision.Market,
@@ -196,25 +211,8 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		Quantity:  decision.Quantity,
 		Price:     decision.Price,
 		Reason:    decision.Reason,
+		Executed:  true,
 	})
-
-	if e.tradingEnabled {
-		e.executeTrade(ctx, decision, savedDecision.ID)
-	}
-}
-
-func (e *Engine) executeTrade(ctx context.Context, decision *llm.TradeDecision, decisionID int64) {
-	log.Printf("Executing trade: %s %s %d @ %.2f", decision.Action, decision.Code, decision.Quantity, decision.Price)
-
-	orderID, err := e.futuClient.PlaceOrder(ctx, decision.Market, decision.Code, decision.Action, decision.Price, decision.Quantity)
-	if err != nil {
-		log.Printf("Failed to execute trade: %v", err)
-		return
-	}
-
-	log.Printf("Trade executed successfully, order ID: %s", orderID)
-
-	e.store.MarkExecuted(decisionID)
 }
 
 func (e *Engine) GetFutuOpendStatus() string {
