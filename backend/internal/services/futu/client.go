@@ -3,7 +3,6 @@ package futu
 import (
 	"context"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -126,41 +125,84 @@ func (c *Client) sendRequest(req *FutuRequest) (*FutuResponse, error) {
 	}, nil
 }
 
-func (c *Client) GetAccountFunds(ctx context.Context) (*AccountFunds, error) {
+func (c *Client) GetAccountFunds(ctx context.Context, market string) (*AccountFunds, error) {
 	if !c.IsConnected() {
 		return nil, fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	return &AccountFunds{
-		TotalAssets: 1000000.0,
-		Cash:        650000.0,
-		MarketValue: 350000.0,
+	switch market {
+	case "CN":
+		return &AccountFunds{
+			Market:      "CN",
+			Currency:    "CNY",
+			TotalAssets: 1000000.0,
+			Cash:        650000.0,
+			MarketValue: 350000.0,
+		}, nil
+	case "HK":
+		return &AccountFunds{
+			Market:      "HK",
+			Currency:    "HKD",
+			TotalAssets: 500000.0,
+			Cash:        300000.0,
+			MarketValue: 200000.0,
+		}, nil
+	case "US":
+		return &AccountFunds{
+			Market:      "US",
+			Currency:    "USD",
+			TotalAssets: 200000.0,
+			Cash:        150000.0,
+			MarketValue: 50000.0,
+		}, nil
+	default:
+		return &AccountFunds{
+			Market:      "ALL",
+			Currency:    "CNY",
+			TotalAssets: 1700000.0,
+			Cash:        1100000.0,
+			MarketValue: 600000.0,
+		}, nil
+	}
+}
+
+func (c *Client) GetAllAccountFunds(ctx context.Context) ([]AccountFunds, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	return []AccountFunds{
+		{Market: "CN", Currency: "CNY", TotalAssets: 1000000.0, Cash: 650000.0, MarketValue: 350000.0},
+		{Market: "HK", Currency: "HKD", TotalAssets: 500000.0, Cash: 300000.0, MarketValue: 200000.0},
+		{Market: "US", Currency: "USD", TotalAssets: 200000.0, Cash: 150000.0, MarketValue: 50000.0},
 	}, nil
 }
 
-func (c *Client) GetPositions(ctx context.Context) ([]Position, error) {
+func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, error) {
 	if !c.IsConnected() {
 		return nil, fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	return []Position{
-		{
-			Code:          "600519",
-			Market:        "CN",
-			Quantity:      100,
-			AvgCost:       1500.00,
-			CurrentPrice:  1520.50,
-			UnrealizedPnL: 2050.00,
-		},
-		{
-			Code:          "000858",
-			Market:        "CN",
-			Quantity:      200,
-			AvgCost:       120.00,
-			CurrentPrice:   118.30,
-			UnrealizedPnL: -340.00,
-		},
-	}, nil
+	allPositions := []Position{
+		{Code: "600519", Market: "CN", Name: "贵州茅台", Quantity: 100, AvgCost: 1500.00, CurrentPrice: 1520.50, UnrealizedPnL: 2050.00},
+		{Code: "000858", Market: "CN", Name: "五粮液", Quantity: 200, AvgCost: 120.00, CurrentPrice: 118.30, UnrealizedPnL: -340.00},
+		{Code: "00700", Market: "HK", Name: "腾讯控股", Quantity: 100, AvgCost: 350.00, CurrentPrice: 380.00, UnrealizedPnL: 3000.00},
+		{Code: "9988", Market: "HK", Name: "阿里巴巴-SW", Quantity: 200, AvgCost: 85.00, CurrentPrice: 82.00, UnrealizedPnL: -600.00},
+		{Code: "AAPL", Market: "US", Name: "苹果公司", Quantity: 50, AvgCost: 180.00, CurrentPrice: 190.00, UnrealizedPnL: 500.00},
+		{Code: "TSLA", Market: "US", Name: "特斯拉", Quantity: 20, AvgCost: 250.00, CurrentPrice: 240.00, UnrealizedPnL: -200.00},
+	}
+
+	if market == "" || market == "ALL" {
+		return allPositions, nil
+	}
+
+	var filtered []Position
+	for _, pos := range allPositions {
+		if pos.Market == market {
+			filtered = append(filtered, pos)
+		}
+	}
+	return filtered, nil
 }
 
 func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, price float64, quantity int) (string, error) {
@@ -168,36 +210,9 @@ func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, pric
 		return "", fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	orderID := fmt.Sprintf("SIM-%d", time.Now().UnixNano())
+	orderID := fmt.Sprintf("SIM-%s-%d", market, time.Now().UnixNano())
 	log.Printf("Simulated order: %s %s %s %d @ %.2f (ID: %s)", side, market, code, quantity, price, orderID)
 	return orderID, nil
-}
-
-func toJSON(v interface{}) string {
-	b, _ := json.Marshal(v)
-	return string(b)
-}
-
-func (c *Client) sendJSON(protoID uint32, data interface{}) (json.RawMessage, error) {
-	body, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.sendRequest(&FutuRequest{
-		ProtoID: protoID,
-		Body:    body,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var result json.RawMessage
-	if err := json.Unmarshal(resp.Body, &result); err != nil {
-		return resp.Body, nil
-	}
-
-	return result, nil
 }
 
 type Quote struct {
@@ -214,18 +229,21 @@ type Quote struct {
 }
 
 type AccountFunds struct {
-	TotalAssets float64
-	Cash        float64
-	MarketValue float64
+	Market      string  `json:"market"`
+	Currency    string  `json:"currency"`
+	TotalAssets float64 `json:"total_assets"`
+	Cash        float64 `json:"cash"`
+	MarketValue float64 `json:"market_value"`
 }
 
 type Position struct {
-	Code          string
-	Market        string
-	Quantity      int
-	AvgCost       float64
-	CurrentPrice  float64
-	UnrealizedPnL float64
+	Code          string  `json:"code"`
+	Market        string  `json:"market"`
+	Name          string  `json:"name"`
+	Quantity      int     `json:"quantity"`
+	AvgCost       float64 `json:"avg_cost"`
+	CurrentPrice  float64 `json:"current_price"`
+	UnrealizedPnL float64 `json:"unrealized_pnl"`
 }
 
 type OrderResult struct {

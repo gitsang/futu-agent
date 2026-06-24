@@ -47,7 +47,7 @@ func main() {
 	llmClient := llm.NewClient(cfg.LLMBaseURL, cfg.LLMModel, cfg.LLMAPIKey, cfg.HTTPProxy)
 	agentEngine := agent.NewEngine(db, futuClient, llmClient, cfg)
 
-	handler := handlers.NewHandler(db, agentEngine)
+	handler := handlers.NewHandler(db, agentEngine, futuClient)
 
 	r := chi.NewRouter()
 
@@ -65,6 +65,7 @@ func main() {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/account/funds", handler.GetAccountFunds)
+		r.Get("/account/funds/all", handler.GetAllAccountFunds)
 		r.Get("/account/positions", handler.GetPositions)
 
 		r.Get("/decisions", handler.GetDecisions)

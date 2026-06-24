@@ -163,13 +163,13 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 
 	log.Printf("Executing agent %s", worker.AgentID)
 
-	accountFunds, err := e.futuClient.GetAccountFunds(ctx)
+	accountFunds, err := e.futuClient.GetAccountFunds(ctx, "CN")
 	if err != nil {
 		log.Printf("Failed to get account funds: %v", err)
 		return
 	}
 
-	positions, err := e.futuClient.GetPositions(ctx)
+	positions, err := e.futuClient.GetPositions(ctx, "CN")
 	if err != nil {
 		log.Printf("Failed to get positions: %v", err)
 		return

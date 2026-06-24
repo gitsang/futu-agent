@@ -10,80 +10,59 @@ import (
 
 	"github.com/gitsang/futu-agent/backend/internal/models"
 	"github.com/gitsang/futu-agent/backend/internal/services/agent"
+	"github.com/gitsang/futu-agent/backend/internal/services/futu"
 )
 
 type Handler struct {
-	db           *sql.DB
-	agentEngine  *agent.Engine
+	db          *sql.DB
+	agentEngine *agent.Engine
+	futuClient  *futu.Client
 }
 
-func NewHandler(db *sql.DB, agentEngine *agent.Engine) *Handler {
+func NewHandler(db *sql.DB, agentEngine *agent.Engine, futuClient *futu.Client) *Handler {
 	return &Handler{
 		db:          db,
 		agentEngine: agentEngine,
+		futuClient:  futuClient,
 	}
 }
 
 func (h *Handler) GetAccountFunds(w http.ResponseWriter, r *http.Request) {
-	var funds models.AccountFunds
-	err := h.db.QueryRow(`
-		SELECT id, total_assets, cash, market_value, updated_at
-		FROM account_funds
-		ORDER BY updated_at DESC
-		LIMIT 1
-	`).Scan(&funds.ID, &funds.TotalAssets, &funds.Cash, &funds.MarketValue, &funds.UpdatedAt)
-
-	if err == sql.ErrNoRows {
-		respondJSON(w, http.StatusOK, models.AccountFundsResponse{
-			TotalAssets: 0,
-			Cash:        0,
-			MarketValue: 0,
-		})
-		return
+	market := r.URL.Query().Get("market")
+	if market == "" {
+		market = "ALL"
 	}
+
+	funds, err := h.futuClient.GetAccountFunds(r.Context(), market)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch account funds")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, models.AccountFundsResponse{
-		TotalAssets: funds.TotalAssets,
-		Cash:        funds.Cash,
-		MarketValue: funds.MarketValue,
-	})
+	respondJSON(w, http.StatusOK, funds)
+}
+
+func (h *Handler) GetAllAccountFunds(w http.ResponseWriter, r *http.Request) {
+	funds, err := h.futuClient.GetAllAccountFunds(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch account funds")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, funds)
 }
 
 func (h *Handler) GetPositions(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.Query(`
-		SELECT id, stock_code, market, quantity, avg_cost, current_price, unrealized_pnl, updated_at
-		FROM positions
-		ORDER BY updated_at DESC
-	`)
+	market := r.URL.Query().Get("market")
+
+	positions, err := h.futuClient.GetPositions(r.Context(), market)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "Failed to fetch positions")
 		return
 	}
-	defer rows.Close()
-
-	var positions []models.PositionResponse
-	for rows.Next() {
-		var p models.Position
-		if err := rows.Scan(&p.ID, &p.StockCode, &p.Market, &p.Quantity, &p.AvgCost, &p.CurrentPrice, &p.UnrealizedPnL, &p.UpdatedAt); err != nil {
-			respondError(w, http.StatusInternalServerError, "Failed to scan position")
-			return
-		}
-		positions = append(positions, models.PositionResponse{
-			StockCode:    p.StockCode,
-			Market:       p.Market,
-			Quantity:     p.Quantity,
-			AvgCost:      p.AvgCost,
-			CurrentPrice: p.CurrentPrice,
-			UnrealizedPnL: p.UnrealizedPnL,
-		})
-	}
 
 	if positions == nil {
-		positions = []models.PositionResponse{}
+		positions = []futu.Position{}
 	}
 
 	respondJSON(w, http.StatusOK, positions)

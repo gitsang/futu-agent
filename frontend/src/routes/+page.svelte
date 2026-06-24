@@ -5,20 +5,28 @@
 	import { formatCurrency, formatDate, cn } from '$lib/utils';
 	import { StatCard, Card, Badge, LoadingSpinner, Button } from '$lib/components';
 
-	let funds = $state<AccountFunds | null>(null);
+	let allFunds = $state<AccountFunds[]>([]);
 	let positions = $state<Position[]>([]);
 	let decisions = $state<Decision[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
+	let selectedMarket = $state<string>('ALL');
+
+	const markets = [
+		{ id: 'ALL', label: '全部', icon: '🌍' },
+		{ id: 'CN', label: 'A股', icon: '🇨🇳' },
+		{ id: 'HK', label: '港股', icon: '🇭🇰' },
+		{ id: 'US', label: '美股', icon: '🇺🇸' }
+	];
 
 	onMount(async () => {
 		try {
 			const [fundsData, positionsData, decisionsData] = await Promise.all([
-				api.getFunds(),
+				api.getAllFunds(),
 				api.getPositions(),
 				api.getDecisions()
 			]);
-			funds = fundsData;
+			allFunds = fundsData;
 			positions = positionsData;
 			decisions = decisionsData.slice(0, 5);
 		} catch (e) {
@@ -28,10 +36,41 @@
 		}
 	});
 
+	let filteredFunds = $derived(
+		selectedMarket === 'ALL'
+			? allFunds.reduce((acc, f) => ({
+					market: 'ALL',
+					currency: 'CNY',
+					total_assets: acc.total_assets + f.total_assets,
+					cash: acc.cash + f.cash,
+					market_value: acc.market_value + f.market_value
+				}), { market: 'ALL', currency: 'CNY', total_assets: 0, cash: 0, market_value: 0 })
+			: allFunds.find(f => f.market === selectedMarket) || { market: selectedMarket, currency: 'CNY', total_assets: 0, cash: 0, market_value: 0 }
+	);
+
+	let filteredPositions = $derived(
+		selectedMarket === 'ALL'
+			? positions
+			: positions.filter(p => p.market === selectedMarket)
+	);
+
+	let totalPnl = $derived(
+		filteredPositions.reduce((sum, p) => sum + p.unrealized_pnl, 0)
+	);
+
 	function getPnlClass(pnl: number): string {
 		if (pnl > 0) return 'text-profit';
 		if (pnl < 0) return 'text-loss';
 		return 'text-text-secondary';
+	}
+
+	function getCurrencySymbol(currency: string): string {
+		switch (currency) {
+			case 'CNY': return '¥';
+			case 'HKD': return 'HK$';
+			case 'USD': return '$';
+			default: return '¥';
+		}
 	}
 </script>
 
@@ -60,26 +99,42 @@
 		</Card>
 	{/if}
 
+	<div class="flex gap-2">
+		{#each markets as market}
+			<button
+				class={cn(
+					'rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200',
+					selectedMarket === market.id
+						? 'bg-accent text-white'
+						: 'bg-surface-elevated text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+				)}
+				onclick={() => selectedMarket = market.id}
+			>
+				{market.icon} {market.label}
+			</button>
+		{/each}
+	</div>
+
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<StatCard
 			label="总资产"
-			value={funds ? formatCurrency(funds.total_assets) : '-'}
+			value={loading ? '-' : `${getCurrencySymbol(filteredFunds.currency)}${filteredFunds.total_assets.toLocaleString()}`}
 			{loading}
 		/>
 		<StatCard
 			label="可用资金"
-			value={funds ? formatCurrency(funds.cash) : '-'}
+			value={loading ? '-' : `${getCurrencySymbol(filteredFunds.currency)}${filteredFunds.cash.toLocaleString()}`}
 			{loading}
 		/>
 		<StatCard
 			label="持仓市值"
-			value={funds ? formatCurrency(funds.market_value) : '-'}
+			value={loading ? '-' : `${getCurrencySymbol(filteredFunds.currency)}${filteredFunds.market_value.toLocaleString()}`}
 			{loading}
 		/>
 		<StatCard
-			label="持仓数量"
-			value={positions.length.toString()}
-			subtitle="只股票"
+			label="持仓盈亏"
+			value={loading ? '-' : `${totalPnl >= 0 ? '+' : ''}${getCurrencySymbol(filteredFunds.currency)}${totalPnl.toLocaleString()}`}
+			variant={totalPnl > 0 ? 'profit' : totalPnl < 0 ? 'loss' : 'default'}
 			{loading}
 		/>
 	</div>
@@ -97,22 +152,22 @@
 				<div class="flex justify-center py-8">
 					<LoadingSpinner />
 				</div>
-			{:else if positions.length === 0}
+			{:else if filteredPositions.length === 0}
 				<div class="py-8 text-center text-text-muted">暂无持仓</div>
 			{:else}
 				<div class="space-y-3">
-					{#each positions.slice(0, 5) as pos}
+					{#each filteredPositions.slice(0, 5) as pos}
 						<div class="flex items-center justify-between rounded-lg bg-surface-elevated p-3 transition-colors hover:bg-surface-hover">
 							<div>
-								<div class="font-medium text-text-primary">{pos.stock_code}</div>
-								<div class="text-xs text-text-muted">{pos.market} · {pos.quantity}股</div>
+								<div class="font-medium text-text-primary">{pos.code}</div>
+								<div class="text-xs text-text-muted">{pos.market} · {pos.name} · {pos.quantity}股</div>
 							</div>
 							<div class="text-right">
 								<div class="font-mono text-sm text-text-primary">
-									{formatCurrency(pos.current_price)}
+									{getCurrencySymbol(pos.market === 'CN' ? 'CNY' : pos.market === 'HK' ? 'HKD' : 'USD')}{pos.current_price.toLocaleString()}
 								</div>
 								<div class={cn('font-mono text-xs', getPnlClass(pos.unrealized_pnl))}>
-									{pos.unrealized_pnl >= 0 ? '+' : ''}{formatCurrency(pos.unrealized_pnl)}
+									{pos.unrealized_pnl >= 0 ? '+' : ''}{pos.unrealized_pnl.toLocaleString()}
 								</div>
 							</div>
 						</div>
@@ -142,11 +197,12 @@
 							<div class="flex items-center justify-between mb-1">
 								<div class="flex items-center gap-2">
 									<span class="font-medium text-text-primary">{decision.stock_code}</span>
-							<Badge
-									variant={decision.action.toLowerCase() === 'buy' ? 'success' : decision.action.toLowerCase() === 'sell' ? 'destructive' : 'default'}
-								>
-									{decision.action.toLowerCase() === 'buy' ? '买入' : decision.action.toLowerCase() === 'sell' ? '卖出' : '持有'}
-								</Badge>
+									<span class="text-xs text-text-muted">{decision.market}</span>
+									<Badge
+										variant={decision.action.toLowerCase() === 'buy' ? 'success' : decision.action.toLowerCase() === 'sell' ? 'destructive' : 'default'}
+									>
+										{decision.action.toLowerCase() === 'buy' ? '买入' : decision.action.toLowerCase() === 'sell' ? '卖出' : '持有'}
+									</Badge>
 								</div>
 								<Badge variant={decision.executed ? 'success' : 'warning'}>
 									{decision.executed ? '已执行' : '待执行'}

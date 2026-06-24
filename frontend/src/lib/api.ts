@@ -21,10 +21,11 @@ async function fetchApi<T>(endpoint: string, options?: RequestInit): Promise<T> 
 }
 
 export const api = {
-	getFunds: () => fetchApi<AccountFunds>('/account/funds'),
-	getPositions: () => fetchApi<Position[]>('/account/positions'),
+	getFunds: (market?: string) => fetchApi<AccountFunds>(`/account/funds${market ? `?market=${market}` : ''}`),
+	getAllFunds: () => fetchApi<AccountFunds[]>('/account/funds/all'),
+	getPositions: (market?: string) => fetchApi<Position[]>(`/account/positions${market ? `?market=${market}` : ''}`),
 
-	getDecisions: () => fetchApi<Decision[]>('/decisions'),
+	getDecisions: (market?: string) => fetchApi<Decision[]>(`/decisions${market ? `?market=${market}` : ''}`),
 	getDecision: (id: string) => fetchApi<Decision>(`/decisions/${id}`),
 
 	getAgents: () => fetchApi<Agent[]>('/agents'),

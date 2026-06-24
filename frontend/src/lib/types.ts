@@ -1,12 +1,15 @@
 export interface AccountFunds {
+	market: string;
+	currency: string;
 	total_assets: number;
 	cash: number;
 	market_value: number;
 }
 
 export interface Position {
-	stock_code: string;
+	code: string;
 	market: string;
+	name: string;
 	quantity: number;
 	avg_cost: number;
 	current_price: number;
@@ -18,7 +21,7 @@ export interface Decision {
 	agent_id: string;
 	stock_code: string;
 	market: string;
-	action: 'buy' | 'sell' | 'hold';
+	action: string;
 	quantity: number;
 	price: number;
 	reason: string;
