@@ -176,7 +176,7 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 	}
 
 	var marketDataLines []string
-	marketDataLines = append(marketDataLines, "=== A股市场模拟数据 ===")
+	marketDataLines = append(marketDataLines, "=== A股市场数据 ===")
 	marketDataLines = append(marketDataLines, "")
 	marketDataLines = append(marketDataLines, "【账户概况】")
 	marketDataLines = append(marketDataLines, fmt.Sprintf("总资产: %.2f", accountFunds.TotalAssets))
@@ -194,11 +194,6 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 				pos.Market, pos.Code, pos.Quantity, pos.AvgCost, pos.CurrentPrice, pos.UnrealizedPnL, pnlPct))
 		}
 	}
-	marketDataLines = append(marketDataLines, "")
-	marketDataLines = append(marketDataLines, "【市场热点】")
-	marketDataLines = append(marketDataLines, "- 白酒板块: 近期表现平稳，贵州茅台(600519)在1500附近震荡")
-	marketDataLines = append(marketDataLines, "- 新能源: 持续调整，宁德时代(300750)估值回归合理区间")
-	marketDataLines = append(marketDataLines, "- 科技板块: AI概念活跃，可关注相关标的")
 
 	marketData := strings.Join(marketDataLines, "\n")
 
