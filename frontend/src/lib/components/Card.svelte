@@ -13,7 +13,7 @@
 
 <div
 	class={cn(
-		'rounded-xl border border-border bg-surface overflow-hidden',
+		'rounded-xl border border-border bg-card text-card-foreground shadow-sm',
 		padding && 'p-6',
 		className
 	)}

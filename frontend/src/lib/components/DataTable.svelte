@@ -33,7 +33,7 @@
 				{#each columns as column}
 					<th
 						class={cn(
-							'px-4 py-3 text-xs font-medium text-text-muted uppercase tracking-wider',
+							'px-4 py-3 text-xs font-medium text-muted-foreground uppercase tracking-wider',
 							column.align === 'center' && 'text-center',
 							column.align === 'right' && 'text-right',
 							column.class
@@ -50,20 +50,20 @@
 					<tr class="border-b border-border-subtle">
 						{#each columns as _}
 							<td class="px-4 py-3">
-								<div class="h-4 w-20 animate-pulse rounded bg-surface-elevated"></div>
+								<div class="h-4 w-20 animate-pulse rounded bg-muted"></div>
 							</td>
 						{/each}
 					</tr>
 				{/each}
 			{:else if data.length === 0}
 				<tr>
-					<td colspan={columns.length} class="px-4 py-8 text-center text-text-muted">
+					<td colspan={columns.length} class="px-4 py-8 text-center text-muted-foreground">
 						{emptyMessage}
 					</td>
 				</tr>
 			{:else}
 				{#each data as row}
-					<tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
+					<tr class="border-b border-border-subtle transition-colors hover:bg-muted/50">
 						{#each columns as column}
 							<td
 								class={cn(

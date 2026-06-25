@@ -15,9 +15,9 @@
 
 <Card>
 	<div class="flex flex-col gap-1">
-		<span class="text-sm text-text-secondary">{label}</span>
+		<span class="text-sm text-muted-foreground">{label}</span>
 		{#if loading}
-			<div class="h-8 w-24 animate-pulse rounded bg-surface-elevated"></div>
+			<div class="h-8 w-24 animate-pulse rounded bg-muted"></div>
 		{:else}
 			<span
 				class={cn(
@@ -30,7 +30,7 @@
 			</span>
 		{/if}
 		{#if subtitle}
-			<span class="text-xs text-text-muted">{subtitle}</span>
+			<span class="text-xs text-muted-foreground">{subtitle}</span>
 		{/if}
 	</div>
 </Card>

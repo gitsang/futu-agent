@@ -81,21 +81,21 @@
 	function getPnlColor(pnl: number): string {
 		if (pnl > 0) return 'text-profit';
 		if (pnl < 0) return 'text-loss';
-		return 'text-text-secondary';
+		return 'text-muted-foreground';
 	}
 
 	function getPnlBg(pnl: number): string {
-		if (pnl > 0) return 'bg-profit-bg';
-		if (pnl < 0) return 'bg-loss-bg';
-		return 'bg-surface-elevated';
+		if (pnl > 0) return 'bg-profit/10';
+		if (pnl < 0) return 'bg-destructive/10';
+		return 'bg-muted';
 	}
 </script>
 
 <div class="space-y-6 animate-fade-in">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-semibold text-text-primary">持仓管理</h1>
-			<p class="text-sm text-text-secondary">当前股票持仓与盈亏分析</p>
+			<h1 class="text-2xl font-semibold text-foreground">持仓管理</h1>
+			<p class="text-sm text-muted-foreground">当前股票持仓与盈亏分析</p>
 		</div>
 		<div class="flex gap-2">
 			<Button variant="secondary" onclick={handleExport}>
@@ -114,8 +114,8 @@
 	</div>
 
 	{#if error}
-		<Card class="border-loss/50 bg-loss/5">
-			<div class="flex items-center gap-3 text-loss">
+		<Card class="border-destructive/50 bg-destructive/5">
+			<div class="flex items-center gap-3 text-destructive">
 				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
 				</svg>
@@ -156,7 +156,7 @@
 				<thead>
 					<tr class="border-b border-border">
 						<th
-							class="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider hover:text-text-secondary cursor-pointer"
+							class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground cursor-pointer"
 							onclick={() => toggleSort('stock_code')}
 							onkeydown={(e) => e.key === 'Enter' && toggleSort('stock_code')}
 							tabindex="0"
@@ -165,12 +165,12 @@
 						>
 							股票 {sortBy === 'stock_code' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
 						</th>
-						<th class="px-4 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">市场</th>
-						<th class="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">持仓数量</th>
-						<th class="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">成本价</th>
-						<th class="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">现价</th>
+						<th class="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">市场</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">持仓数量</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">成本价</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">现价</th>
 						<th
-							class="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider hover:text-text-secondary cursor-pointer"
+							class="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-foreground cursor-pointer"
 							onclick={() => toggleSort('unrealized_pnl')}
 							onkeydown={(e) => e.key === 'Enter' && toggleSort('unrealized_pnl')}
 							tabindex="0"
@@ -179,7 +179,7 @@
 						>
 							盈亏 {sortBy === 'unrealized_pnl' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
 						</th>
-						<th class="px-4 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">盈亏率</th>
+						<th class="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">盈亏率</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -188,14 +188,14 @@
 							<tr class="border-b border-border-subtle">
 								{#each Array(7) as _}
 									<td class="px-4 py-3">
-										<div class="h-4 w-16 animate-pulse rounded bg-surface-elevated"></div>
+										<div class="h-4 w-16 animate-pulse rounded bg-muted"></div>
 									</td>
 								{/each}
 							</tr>
 						{/each}
 					{:else if sortedPositions.length === 0}
 						<tr>
-							<td colspan="7" class="px-4 py-12 text-center text-text-muted">
+							<td colspan="7" class="px-4 py-12 text-center text-muted-foreground">
 								暂无持仓数据
 							</td>
 						</tr>
@@ -203,21 +203,21 @@
 				{#each sortedPositions as pos}
 						{@const pnl = (pos.current_price - pos.avg_cost) * pos.quantity}
 						{@const pnlPercent = pos.avg_cost > 0 ? ((pos.current_price - pos.avg_cost) / pos.avg_cost) * 100 : 0}
-						<tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
+						<tr class="border-b border-border-subtle transition-colors hover:bg-muted/50">
 							<td class="px-4 py-3">
-								<div class="font-medium text-text-primary">{pos.code}</div>
-								<div class="text-xs text-text-muted">{pos.name}</div>
+								<div class="font-medium text-foreground">{pos.code}</div>
+								<div class="text-xs text-muted-foreground">{pos.name}</div>
 							</td>
 							<td class="px-4 py-3">
 								<Badge variant="default">{pos.market}</Badge>
 							</td>
-							<td class="px-4 py-3 text-right font-mono text-sm text-text-primary">
+							<td class="px-4 py-3 text-right font-mono text-sm text-foreground">
 								{formatNumber(pos.quantity, 0)}
 							</td>
-							<td class="px-4 py-3 text-right font-mono text-sm text-text-secondary">
+							<td class="px-4 py-3 text-right font-mono text-sm text-muted-foreground">
 								{formatCurrency(pos.avg_cost)}
 							</td>
-							<td class="px-4 py-3 text-right font-mono text-sm text-text-primary">
+							<td class="px-4 py-3 text-right font-mono text-sm text-foreground">
 								{formatCurrency(pos.current_price)}
 							</td>
 							<td class="px-4 py-3 text-right">

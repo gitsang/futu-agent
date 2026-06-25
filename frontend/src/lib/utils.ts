@@ -1,3 +1,17 @@
+import { clsx, type ClassValue } from "clsx";
+import { twMerge } from "tailwind-merge";
+
+export function cn(...inputs: ClassValue[]) {
+	return twMerge(clsx(inputs));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WithoutChild<T> = T extends { child?: any } ? Omit<T, "child"> : T;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type WithoutChildren<T> = T extends { children?: any } ? Omit<T, "children"> : T;
+export type WithoutChildrenOrChild<T> = WithoutChildren<WithoutChild<T>>;
+export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?: U | null };
+
 export function formatCurrency(value: number, currency = 'CNY'): string {
 	return new Intl.NumberFormat('zh-CN', {
 		style: 'currency',
@@ -27,10 +41,6 @@ export function formatDate(dateStr: string): string {
 		hour: '2-digit',
 		minute: '2-digit'
 	}).format(date);
-}
-
-export function cn(...classes: (string | boolean | undefined | null)[]): string {
-	return classes.filter(Boolean).join(' ');
 }
 
 export function exportToCSV(data: Record<string, unknown>[], filename: string) {

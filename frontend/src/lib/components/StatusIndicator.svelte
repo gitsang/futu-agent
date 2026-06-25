@@ -11,13 +11,13 @@
 
 	const statusColors = {
 		online: 'bg-profit',
-		offline: 'bg-loss',
+		offline: 'bg-destructive',
 		warning: 'bg-warning',
-		unknown: 'bg-text-muted'
+		unknown: 'bg-muted-foreground'
 	};
 </script>
 
 <div class={cn('flex items-center gap-2', className)}>
 	<div class={cn('h-2 w-2 rounded-full', statusColors[status])}></div>
-	<span class="text-sm text-text-secondary">{label}</span>
+	<span class="text-sm text-muted-foreground">{label}</span>
 </div>

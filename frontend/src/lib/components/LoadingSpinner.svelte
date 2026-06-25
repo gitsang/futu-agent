@@ -17,7 +17,7 @@
 
 <div
 	class={cn(
-		'animate-spin rounded-full border-2 border-border border-t-accent',
+		'animate-spin rounded-full border-2 border-muted-foreground/20 border-t-primary',
 		sizes[size],
 		className
 	)}

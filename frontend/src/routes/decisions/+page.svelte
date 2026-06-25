@@ -87,8 +87,8 @@
 <div class="space-y-6 animate-fade-in">
 	<div class="flex items-center justify-between">
 		<div>
-			<h1 class="text-2xl font-semibold text-text-primary">决策日志</h1>
-			<p class="text-sm text-text-secondary">AI 交易决策记录与分析</p>
+			<h1 class="text-2xl font-semibold text-foreground">决策日志</h1>
+			<p class="text-sm text-muted-foreground">AI 交易决策记录与分析</p>
 		</div>
 		<div class="flex gap-2">
 			<Button variant="secondary" onclick={handleExport}>
@@ -107,8 +107,8 @@
 	</div>
 
 	{#if error}
-		<Card class="border-loss/50 bg-loss/5">
-			<div class="flex items-center gap-3 text-loss">
+		<Card class="border-destructive/50 bg-destructive/5">
+			<div class="flex items-center gap-3 text-destructive">
 				<svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
 				</svg>
@@ -123,8 +123,8 @@
 				class={cn(
 					'rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200',
 					filter === f.value
-						? 'bg-accent text-white'
-						: 'bg-surface-elevated text-text-secondary hover:text-text-primary hover:bg-surface-hover'
+						? 'bg-primary text-primary-foreground'
+						: 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
 				)}
 				onclick={() => filter = f.value as typeof filter}
 			>
@@ -141,7 +141,7 @@
 				</div>
 			{:else if filteredDecisions.length === 0}
 				<Card>
-					<div class="py-12 text-center text-text-muted">暂无决策记录</div>
+					<div class="py-12 text-center text-muted-foreground">暂无决策记录</div>
 				</Card>
 			{:else}
 				{#each filteredDecisions as decision}
@@ -149,15 +149,15 @@
 						class={cn(
 							'w-full text-left rounded-xl border p-4 transition-all duration-200 cursor-pointer',
 							selectedDecision?.id === decision.id
-								? 'border-accent bg-accent/5'
-								: 'border-border bg-surface hover:border-border-subtle hover:bg-surface-elevated'
+								? 'border-primary bg-primary/5'
+								: 'border-border bg-card hover:border-border/80 hover:bg-muted'
 						)}
 						onclick={() => selectedDecision = decision}
 					>
 						<div class="flex items-center justify-between mb-2">
 							<div class="flex items-center gap-3">
-								<span class="font-semibold text-text-primary">{decision.stock_code}</span>
-								<span class="text-xs text-text-muted">{decision.market}</span>
+								<span class="font-semibold text-foreground">{decision.stock_code}</span>
+								<span class="text-xs text-muted-foreground">{decision.market}</span>
 								<Badge variant={getActionVariant(decision.action)}>
 									{getActionLabel(decision.action)}
 								</Badge>
@@ -166,8 +166,8 @@
 								{decision.executed ? '已执行' : '待执行'}
 							</Badge>
 						</div>
-						<p class="text-sm text-text-secondary line-clamp-2 mb-2">{decision.reason}</p>
-						<div class="flex items-center justify-between text-xs text-text-muted">
+						<p class="text-sm text-muted-foreground line-clamp-2 mb-2">{decision.reason}</p>
+						<div class="flex items-center justify-between text-xs text-muted-foreground">
 							<span>数量: {decision.quantity} · 价格: {decision.price}</span>
 							<span>{formatDate(decision.created_at)}</span>
 						</div>
@@ -176,7 +176,7 @@
 
 				{#if totalPages > 1}
 					<div class="flex items-center justify-between pt-4">
-						<div class="text-sm text-text-muted">
+						<div class="text-sm text-muted-foreground">
 							共 {totalItems} 条记录，第 {currentPage}/{totalPages} 页
 						</div>
 						<div class="flex gap-2">
@@ -205,19 +205,19 @@
 		<div class="lg:col-span-1">
 			{#if selectedDecision}
 				<Card class="sticky top-6">
-					<h3 class="text-lg font-semibold text-text-primary mb-4">决策详情</h3>
+					<h3 class="text-lg font-semibold text-foreground mb-4">决策详情</h3>
 
 					<div class="space-y-4">
 						<div>
-							<span class="text-xs text-text-muted">股票代码</span>
-							<div class="text-sm font-medium text-text-primary">{selectedDecision.stock_code}</div>
+							<span class="text-xs text-muted-foreground">股票代码</span>
+							<div class="text-sm font-medium text-foreground">{selectedDecision.stock_code}</div>
 						</div>
 						<div>
-							<span class="text-xs text-text-muted">市场</span>
-							<div class="text-sm text-text-primary">{selectedDecision.market}</div>
+							<span class="text-xs text-muted-foreground">市场</span>
+							<div class="text-sm text-foreground">{selectedDecision.market}</div>
 						</div>
 						<div>
-							<span class="text-xs text-text-muted">操作</span>
+							<span class="text-xs text-muted-foreground">操作</span>
 							<div>
 								<Badge variant={getActionVariant(selectedDecision.action)}>
 									{getActionLabel(selectedDecision.action)}
@@ -226,20 +226,20 @@
 						</div>
 						<div class="grid grid-cols-2 gap-4">
 							<div>
-								<span class="text-xs text-text-muted">数量</span>
-								<div class="text-sm font-mono text-text-primary">{selectedDecision.quantity}</div>
+								<span class="text-xs text-muted-foreground">数量</span>
+								<div class="text-sm font-mono text-foreground">{selectedDecision.quantity}</div>
 							</div>
 							<div>
-								<span class="text-xs text-text-muted">价格</span>
-								<div class="text-sm font-mono text-text-primary">{selectedDecision.price}</div>
+								<span class="text-xs text-muted-foreground">价格</span>
+								<div class="text-sm font-mono text-foreground">{selectedDecision.price}</div>
 							</div>
 						</div>
 						<div>
-							<span class="text-xs text-text-muted">决策原因</span>
-							<p class="mt-1 text-sm text-text-secondary leading-relaxed">{selectedDecision.reason}</p>
+							<span class="text-xs text-muted-foreground">决策原因</span>
+							<p class="mt-1 text-sm text-muted-foreground leading-relaxed">{selectedDecision.reason}</p>
 						</div>
 						<div>
-							<span class="text-xs text-text-muted">执行状态</span>
+							<span class="text-xs text-muted-foreground">执行状态</span>
 							<div>
 								<Badge variant={selectedDecision.executed ? 'success' : 'warning'}>
 									{selectedDecision.executed ? '已执行' : '待执行'}
@@ -247,14 +247,14 @@
 							</div>
 						</div>
 						<div>
-							<span class="text-xs text-text-muted">创建时间</span>
-							<div class="text-sm text-text-primary">{formatDate(selectedDecision.created_at)}</div>
+							<span class="text-xs text-muted-foreground">创建时间</span>
+							<div class="text-sm text-foreground">{formatDate(selectedDecision.created_at)}</div>
 						</div>
 					</div>
 				</Card>
 			{:else}
 				<Card>
-					<div class="py-12 text-center text-text-muted">
+					<div class="py-12 text-center text-muted-foreground">
 						<svg class="mx-auto h-12 w-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
 						</svg>

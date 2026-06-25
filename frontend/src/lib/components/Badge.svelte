@@ -3,7 +3,7 @@
 	import type { Snippet } from 'svelte';
 
 	interface Props {
-		variant?: 'default' | 'success' | 'destructive' | 'warning' | 'info';
+		variant?: 'default' | 'secondary' | 'destructive' | 'outline' | 'success' | 'warning' | 'info';
 		class?: string;
 		children: Snippet;
 	}
@@ -11,20 +11,22 @@
 	let { variant = 'default', class: className = '', children }: Props = $props();
 
 	const variants = {
-		default: 'bg-surface-elevated text-text-secondary',
-		success: 'bg-profit-bg text-profit',
-		destructive: 'bg-loss-bg text-loss',
-		warning: 'bg-warning/10 text-warning',
-		info: 'bg-info/10 text-info'
+		default: 'border-transparent bg-primary text-primary-foreground shadow-xs',
+		secondary: 'border-transparent bg-secondary text-secondary-foreground shadow-xs',
+		destructive: 'border-transparent bg-destructive text-white shadow-xs',
+		outline: 'text-foreground',
+		success: 'border-transparent bg-profit text-white shadow-xs',
+		warning: 'border-transparent bg-warning text-white shadow-xs',
+		info: 'border-transparent bg-info text-white shadow-xs'
 	};
 </script>
 
-<span
+<div
 	class={cn(
-		'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+		'inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
 		variants[variant],
 		className
 	)}
 >
 	{@render children()}
-</span>
+</div>
