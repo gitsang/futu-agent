@@ -5,6 +5,29 @@ agents:
       description: 专注于A股市场的自动交易代理
       llm_model: mimo-v2.5-pro
       enabled: true
+      stock_universe:
+        source: screen
+        screen_config:
+          market: CN
+          filters:
+            - field: price
+              operator: ">="
+              value: 10
+            - field: price
+              operator: "<="
+              value: 100
+            - field: market_cap
+              operator: ">"
+              value: 100
+              unit: 亿
+            - field: pe
+              operator: "<"
+              value: 30
+          sort:
+            - field: market_cap
+              direction: desc
+          limit: 100
+        watchlist: []
       trading_strategy: |
         基于技术分析的A股交易策略：
         1. 关注大盘走势（上证指数、深证成指）
@@ -31,6 +54,29 @@ agents:
       description: 专注于港股市场的自动交易代理
       llm_model: mimo-v2.5-pro
       enabled: true
+      stock_universe:
+        source: screen
+        screen_config:
+          market: HK
+          filters:
+            - field: price
+              operator: ">="
+              value: 10
+            - field: price
+              operator: "<="
+              value: 500
+            - field: market_cap
+              operator: ">"
+              value: 50
+              unit: 亿
+            - field: pe
+              operator: "<"
+              value: 25
+          sort:
+            - field: market_cap
+              direction: desc
+          limit: 100
+        watchlist: []
       trading_strategy: |
         基于基本面分析的港股交易策略：
         1. 关注恒生指数走势
@@ -57,6 +103,29 @@ agents:
       description: 专注于美股市场的自动交易代理
       llm_model: mimo-v2.5-pro
       enabled: true
+      stock_universe:
+        source: screen
+        screen_config:
+          market: US
+          filters:
+            - field: price
+              operator: ">="
+              value: 10
+            - field: price
+              operator: "<="
+              value: 500
+            - field: market_cap
+              operator: ">"
+              value: 10
+              unit: B
+            - field: pe
+              operator: "<"
+              value: 35
+          sort:
+            - field: market_cap
+              direction: desc
+          limit: 100
+        watchlist: []
       trading_strategy: |
         基于趋势跟踪的美股交易策略：
         1. 关注纳斯达克、标普500指数
