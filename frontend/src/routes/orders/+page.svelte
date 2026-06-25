@@ -10,18 +10,28 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	onMount(async () => {
+	async function loadOrders() {
+		loading = true;
 		try {
-			orders = await api.getOrders();
+			const market = $selectedMarket === 'ALL' ? undefined : $selectedMarket;
+			orders = await api.getOrders(market);
 		} catch (e) {
 			error = e instanceof Error ? e.message : '加载失败';
 		} finally {
 			loading = false;
 		}
+	}
+
+	onMount(() => loadOrders());
+
+	$effect(() => {
+		if ($selectedMarket) {
+			loadOrders();
+		}
 	});
 
 	function handleExport() {
-		const exportData = filteredOrders.map(o => ({
+		const exportData = orders.map(o => ({
 			'订单号': o.order_id,
 			'股票代码': o.code,
 			'股票名称': o.name,
@@ -36,12 +46,6 @@
 		}));
 		exportToCSV(exportData, '订单数据');
 	}
-
-	let filteredOrders = $derived(
-		$selectedMarket === 'ALL'
-			? orders
-			: orders.filter(o => o.market === $selectedMarket)
-	);
 
 	function getStatusColor(status: string): 'success' | 'destructive' | 'warning' | 'default' {
 		switch (status) {
@@ -156,14 +160,14 @@
 								{/each}
 							</tr>
 						{/each}
-					{:else if filteredOrders.length === 0}
-						<tr>
-							<td colspan="10" class="px-4 py-12 text-center text-text-muted">
-								暂无订单数据
-							</td>
-						</tr>
-					{:else}
-						{#each filteredOrders as order}
+				{:else if orders.length === 0}
+					<tr>
+						<td colspan="10" class="px-4 py-12 text-center text-text-muted">
+							暂无订单数据
+						</td>
+					</tr>
+				{:else}
+					{#each orders as order}
 							<tr class="border-b border-border-subtle transition-colors hover:bg-surface-hover">
 								<td class="px-4 py-3">
 									<div class="font-mono text-xs text-text-muted">{order.order_id?.slice(-8) || '-'}</div>

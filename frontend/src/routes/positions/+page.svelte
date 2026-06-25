@@ -12,13 +12,23 @@
 	let sortBy = $state<'stock_code' | 'unrealized_pnl' | 'market_value'>('stock_code');
 	let sortOrder = $state<'asc' | 'desc'>('asc');
 
-	onMount(async () => {
+	async function loadPositions() {
+		loading = true;
 		try {
-			positions = await api.getPositions();
+			const market = $selectedMarket === 'ALL' ? undefined : $selectedMarket;
+			positions = await api.getPositions(market);
 		} catch (e) {
 			error = e instanceof Error ? e.message : '加载失败';
 		} finally {
 			loading = false;
+		}
+	}
+
+	onMount(() => loadPositions());
+
+	$effect(() => {
+		if ($selectedMarket) {
+			loadPositions();
 		}
 	});
 
@@ -36,13 +46,7 @@
 		exportToCSV(exportData, '持仓数据');
 	}
 
-	let filteredPositions = $derived(
-		$selectedMarket === 'ALL'
-			? positions
-			: positions.filter(p => p.market === $selectedMarket)
-	);
-
-	let sortedPositions = $derived([...filteredPositions].sort((a, b) => {
+	let sortedPositions = $derived([...positions].sort((a, b) => {
 		let comparison = 0;
 		switch (sortBy) {
 			case 'stock_code':
@@ -60,9 +64,9 @@
 		return sortOrder === 'asc' ? comparison : -comparison;
 	}));
 
-	let totalPnl = $derived(filteredPositions.reduce((sum, p) => sum + ((p.current_price - p.avg_cost) * p.quantity), 0));
-	let totalMarketValue = $derived(filteredPositions.reduce((sum, p) => sum + (p.current_price * p.quantity), 0));
-	let totalCost = $derived(filteredPositions.reduce((sum, p) => sum + (p.avg_cost * p.quantity), 0));
+	let totalPnl = $derived(positions.reduce((sum, p) => sum + ((p.current_price - p.avg_cost) * p.quantity), 0));
+	let totalMarketValue = $derived(positions.reduce((sum, p) => sum + (p.current_price * p.quantity), 0));
+	let totalCost = $derived(positions.reduce((sum, p) => sum + (p.avg_cost * p.quantity), 0));
 	let totalPnlPercent = $derived(totalCost > 0 ? (totalPnl / totalCost) * 100 : 0);
 
 	function toggleSort(column: typeof sortBy) {
@@ -140,7 +144,7 @@
 		/>
 		<StatCard
 			label="持仓数量"
-			value={filteredPositions.length.toString()}
+			value={positions.length.toString()}
 			subtitle="只股票"
 			{loading}
 		/>

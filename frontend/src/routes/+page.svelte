@@ -6,7 +6,7 @@
 	import { StatCard, Card, Badge, LoadingSpinner, Button } from '$lib/components';
 	import { selectedMarket } from '$lib/stores';
 
-	let allFunds = $state<AccountFunds[]>([]);
+	let funds = $state<AccountFunds | null>(null);
 	let positions = $state<Position[]>([]);
 	let decisions = $state<Decision[]>([]);
 	let tradingStats = $state<TradingStats | null>(null);
@@ -14,16 +14,18 @@
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
-	onMount(async () => {
+	async function loadData() {
+		loading = true;
 		try {
+			const market = $selectedMarket === 'ALL' ? undefined : $selectedMarket;
 			const [fundsData, positionsData, decisionsResult, statsData, overviewData] = await Promise.all([
-				api.getAllFunds(),
-				api.getPositions(),
-				api.getDecisions(undefined, 1, 5),
-				api.getTradingStats(),
+				api.getFunds(market),
+				api.getPositions(market),
+				api.getDecisions(market, 1, 5),
+				api.getTradingStats(market),
 				api.getMarketOverview()
 			]);
-			allFunds = fundsData;
+			funds = fundsData;
 			positions = positionsData;
 			decisions = decisionsResult.data || [];
 			tradingStats = statsData;
@@ -33,34 +35,18 @@
 		} finally {
 			loading = false;
 		}
+	}
+
+	onMount(() => loadData());
+
+	$effect(() => {
+		if ($selectedMarket) {
+			loadData();
+		}
 	});
 
-	let filteredFunds = $derived(
-		$selectedMarket === 'ALL'
-			? allFunds.reduce((acc, f) => ({
-					market: 'ALL',
-					currency: 'CNY',
-					total_assets: acc.total_assets + f.total_assets,
-					cash: acc.cash + f.cash,
-					market_value: acc.market_value + f.market_value
-				}), { market: 'ALL', currency: 'CNY', total_assets: 0, cash: 0, market_value: 0 })
-			: allFunds.find(f => f.market === $selectedMarket) || { market: $selectedMarket, currency: 'CNY', total_assets: 0, cash: 0, market_value: 0 }
-	);
-
-	let filteredPositions = $derived(
-		$selectedMarket === 'ALL'
-			? positions
-			: positions.filter(p => p.market === $selectedMarket)
-	);
-
-	let filteredDecisions = $derived(
-		$selectedMarket === 'ALL'
-			? decisions
-			: decisions.filter(d => d.market === $selectedMarket)
-	);
-
 	let totalPnl = $derived(
-		filteredPositions.reduce((sum, p) => sum + p.unrealized_pnl, 0)
+		positions.reduce((sum, p) => sum + p.unrealized_pnl, 0)
 	);
 
 	function getPnlClass(pnl: number): string {
@@ -107,22 +93,22 @@
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<StatCard
 			label="总资产"
-			value={loading ? '-' : `${getCurrencySymbol(filteredFunds.currency)}${filteredFunds.total_assets.toLocaleString()}`}
+			value={loading || !funds ? '-' : `${getCurrencySymbol(funds.currency)}${funds.total_assets.toLocaleString()}`}
 			{loading}
 		/>
 		<StatCard
 			label="可用资金"
-			value={loading ? '-' : `${getCurrencySymbol(filteredFunds.currency)}${filteredFunds.cash.toLocaleString()}`}
+			value={loading || !funds ? '-' : `${getCurrencySymbol(funds.currency)}${funds.cash.toLocaleString()}`}
 			{loading}
 		/>
 		<StatCard
 			label="持仓市值"
-			value={loading ? '-' : `${getCurrencySymbol(filteredFunds.currency)}${filteredFunds.market_value.toLocaleString()}`}
+			value={loading || !funds ? '-' : `${getCurrencySymbol(funds.currency)}${funds.market_value.toLocaleString()}`}
 			{loading}
 		/>
 		<StatCard
 			label="持仓盈亏"
-			value={loading ? '-' : `${totalPnl >= 0 ? '+' : ''}${getCurrencySymbol(filteredFunds.currency)}${totalPnl.toLocaleString()}`}
+			value={loading || !funds ? '-' : `${totalPnl >= 0 ? '+' : ''}${getCurrencySymbol(funds.currency)}${totalPnl.toLocaleString()}`}
 			variant={totalPnl > 0 ? 'profit' : totalPnl < 0 ? 'loss' : 'default'}
 			{loading}
 		/>
@@ -183,11 +169,11 @@
 				<div class="flex justify-center py-8">
 					<LoadingSpinner />
 				</div>
-			{:else if filteredPositions.length === 0}
+			{:else if positions.length === 0}
 				<div class="py-8 text-center text-text-muted">暂无持仓</div>
 			{:else}
 				<div class="space-y-3">
-					{#each filteredPositions.slice(0, 5) as pos}
+					{#each positions.slice(0, 5) as pos}
 						<div class="flex items-center justify-between rounded-lg bg-surface-elevated p-3 transition-colors hover:bg-surface-hover">
 							<div>
 								<div class="font-medium text-text-primary">{pos.code}</div>
@@ -219,11 +205,11 @@
 				<div class="flex justify-center py-8">
 					<LoadingSpinner />
 				</div>
-			{:else if filteredDecisions.length === 0}
+			{:else if decisions.length === 0}
 				<div class="py-8 text-center text-text-muted">暂无决策记录</div>
 			{:else}
 				<div class="space-y-3">
-					{#each filteredDecisions as decision}
+					{#each decisions as decision}
 						<div class="rounded-lg bg-surface-elevated p-3 transition-colors hover:bg-surface-hover">
 							<div class="flex items-center justify-between mb-1">
 								<div class="flex items-center gap-2">
