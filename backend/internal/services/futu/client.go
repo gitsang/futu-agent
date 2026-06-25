@@ -11,6 +11,7 @@ import (
 	futuapi "github.com/shing1211/futuapi4go/pkg/futuapi"
 	"github.com/shing1211/futuapi4go/client"
 	"github.com/shing1211/futuapi4go/pkg/constant"
+	"github.com/shing1211/futuapi4go/pkg/trd"
 )
 
 var marketMap = map[string]constant.TrdMarket{
@@ -357,6 +358,38 @@ func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, pric
 	orderID := fmt.Sprintf("%d", result.OrderID)
 	log.Printf("Order placed: %s %s %s %d @ %.2f (OrderID: %s)", side, market, code, quantity, price, orderID)
 	return orderID, nil
+}
+
+func (c *Client) CancelOrder(ctx context.Context, market string, orderID uint64) error {
+	if !c.IsConnected() {
+		return fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	accIDs := c.accMap[market]
+	if len(accIDs) == 0 {
+		accIDs = []uint64{c.accID}
+	}
+	accID := accIDs[0]
+
+	trdMarket, ok := marketMap[market]
+	if !ok {
+		return fmt.Errorf("unsupported market: %s", market)
+	}
+
+	req := &trd.ModifyOrderRequest{
+		AccID:         accID,
+		TrdMarket:     trdMarket,
+		OrderID:       orderID,
+		ModifyOrderOp: constant.ModifyOrderOp_Cancel,
+	}
+
+	_, err := trd.ModifyOrder(ctx, c.sdkClient.Inner(), req)
+	if err != nil {
+		return fmt.Errorf("CancelOrder failed: %w", err)
+	}
+
+	log.Printf("Order cancelled: %s OrderID: %d", market, orderID)
+	return nil
 }
 
 func (c *Client) GetQuote(ctx context.Context, market, code string) (*Quote, error) {

@@ -25,6 +25,8 @@ type Engine struct {
 	ctx            context.Context
 	cancel         context.CancelFunc
 	tradingEnabled bool
+	recentOrders   map[string]time.Time
+	recentOrdersMu sync.RWMutex
 }
 
 type AgentWorker struct {
@@ -44,6 +46,7 @@ func NewEngine(store *store.MemoryStore, futuClient *futu.CachedClient, llmClien
 		config:         cfg,
 		agents:         make(map[string]*AgentWorker),
 		tradingEnabled: cfg.TradingEnabled,
+		recentOrders:   make(map[string]time.Time),
 	}
 }
 
@@ -112,6 +115,8 @@ func (e *Engine) executeCycle() {
 		return
 	}
 
+	e.cancelStaleOrders()
+
 	e.mu.RLock()
 	agents := make([]*AgentWorker, 0, len(e.agents))
 	for _, agent := range e.agents {
@@ -126,13 +131,67 @@ func (e *Engine) executeCycle() {
 	}
 }
 
+func (e *Engine) cancelStaleOrders() {
+	markets := []string{"HK", "US", "CN"}
+	for _, market := range markets {
+		orders, err := e.futuClient.GetOrders(e.ctx, market)
+		if err != nil {
+			log.Printf("Failed to get orders for market %s: %v", market, err)
+			continue
+		}
+
+		log.Printf("Checking %d orders in market %s for stale orders", len(orders), market)
+
+		for _, order := range orders {
+			if order.Status != "SUBMITTED" {
+				continue
+			}
+
+			createTime, err := time.ParseInLocation("2006-01-02 15:04:05", order.CreateTime, time.Local)
+			if err != nil {
+				log.Printf("Failed to parse create time for order %s: %v", order.OrderID, err)
+				continue
+			}
+
+			age := time.Since(createTime)
+			log.Printf("Order %s age: %v (threshold: 30m)", order.OrderID, age)
+
+			if age > 30*time.Minute {
+				orderID, err := parseOrderID(order.OrderID)
+				if err != nil {
+					log.Printf("Failed to parse order ID %s: %v", order.OrderID, err)
+					continue
+				}
+
+				log.Printf("Cancelling stale order: %s %s %s %d @ %.2f (created: %s, age: %v)",
+					order.Side, market, order.Code, int(order.Qty), order.Price, order.CreateTime, age)
+
+				if err := e.futuClient.CancelOrder(e.ctx, market, orderID); err != nil {
+					log.Printf("Failed to cancel order %s: %v", order.OrderID, err)
+				}
+			}
+		}
+	}
+}
+
+func parseOrderID(orderIDStr string) (uint64, error) {
+	var orderID uint64
+	_, err := fmt.Sscanf(orderIDStr, "%d", &orderID)
+	return orderID, err
+}
+
 func (e *Engine) executeAgent(worker *AgentWorker) {
 	ctx, cancel := context.WithTimeout(e.ctx, 5*time.Minute)
 	defer cancel()
 
-	log.Printf("Executing agent %s", worker.AgentID)
-
 	market := worker.Config.Market
+	marketStatus := futu.GetMarketStatus(market)
+	log.Printf("Executing agent %s (市场: %s, 状态: %s)", worker.AgentID, market, marketStatus)
+
+	if !futu.IsMarketOpen(market) {
+		log.Printf("市场 %s 休中，跳过交易决策", market)
+		return
+	}
 
 	accountFunds, err := e.futuClient.GetAccountFunds(ctx, market)
 	if err != nil {
@@ -200,12 +259,46 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 	}
 
 	if e.tradingEnabled {
+		if e.isDuplicateOrder(decision.Code, decision.Action) {
+			log.Printf("Agent %s 重复下单检测: %s %s 已在最近5分钟内下过单，跳过", worker.AgentID, decision.Action, decision.Code)
+			e.store.SaveDecision(store.TradeDecision{
+				AgentID:   worker.AgentID,
+				StockCode: decision.Code,
+				Market:    decision.Market,
+				Action:    decision.Action,
+				Quantity:  decision.Quantity,
+				Price:     decision.Price,
+				Reason:    fmt.Sprintf("%s (重复下单，已跳过)", decision.Reason),
+				Executed:  false,
+			})
+			return
+		}
+
+		decision.Price = e.optimizeOrderPrice(ctx, decision, market)
+		log.Printf("Agent %s 优化后价格: %.2f", worker.AgentID, decision.Price)
+
+		if err := e.validateOrder(decision, positions, accountFunds); err != nil {
+			log.Printf("Agent %s 订单校验失败: %v", worker.AgentID, err)
+			e.store.SaveDecision(store.TradeDecision{
+				AgentID:   worker.AgentID,
+				StockCode: decision.Code,
+				Market:    decision.Market,
+				Action:    decision.Action,
+				Quantity:  decision.Quantity,
+				Price:     decision.Price,
+				Reason:    fmt.Sprintf("%s (校验失败: %s)", decision.Reason, err.Error()),
+				Executed:  false,
+			})
+			return
+		}
+
 		orderID, err := e.futuClient.PlaceOrder(ctx, decision.Market, decision.Code, decision.Action, decision.Price, decision.Quantity)
 		if err != nil {
 			log.Printf("Failed to execute trade: %v", err)
 			return
 		}
 		log.Printf("Trade executed successfully, order ID: %s", orderID)
+		e.recordOrder(decision.Code, decision.Action)
 	}
 
 	e.store.SaveDecision(store.TradeDecision{
@@ -229,6 +322,84 @@ func (e *Engine) GetFutuOpendStatus() string {
 
 func (e *Engine) IsTradingEnabled() bool {
 	return e.tradingEnabled
+}
+
+func (e *Engine) validateOrder(decision *llm.TradeDecision, positions []futu.Position, funds *futu.AccountFunds) error {
+	if decision.Action == "SELL" {
+		for _, pos := range positions {
+			if pos.Code == decision.Code {
+				if pos.Quantity < decision.Quantity {
+					return fmt.Errorf("持仓不足: 持有%d股, 卖出%d股", pos.Quantity, decision.Quantity)
+				}
+				return nil
+			}
+		}
+		return fmt.Errorf("没有持仓: 未持有%s", decision.Code)
+	}
+
+	if decision.Action == "BUY" {
+		requiredFunds := decision.Price * float64(decision.Quantity)
+		if funds.Cash < requiredFunds {
+			return fmt.Errorf("资金不足: 需要%.2f, 可用%.2f", requiredFunds, funds.Cash)
+		}
+	}
+
+	return nil
+}
+
+func (e *Engine) optimizeOrderPrice(ctx context.Context, decision *llm.TradeDecision, market string) float64 {
+	quote, err := e.futuClient.GetQuote(ctx, market, decision.Code)
+	if err != nil {
+		log.Printf("无法获取行情，使用原始价格: %v", err)
+		return decision.Price
+	}
+
+	currentPrice := quote.Price
+	if currentPrice <= 0 {
+		log.Printf("当前价格无效 (%.2f)，使用原始价格", currentPrice)
+		return decision.Price
+	}
+
+	var optimizedPrice float64
+	if decision.Action == "BUY" {
+		optimizedPrice = currentPrice * 1.005
+	} else {
+		optimizedPrice = currentPrice * 0.995
+	}
+
+	optimizedPrice = float64(int(optimizedPrice*100)) / 100
+
+	log.Printf("价格优化: LLM价格=%.2f, 当前价=%.2f, 优化后=%.2f", decision.Price, currentPrice, optimizedPrice)
+	return optimizedPrice
+}
+
+func (e *Engine) isDuplicateOrder(code, action string) bool {
+	key := fmt.Sprintf("%s:%s", code, action)
+	
+	e.recentOrdersMu.RLock()
+	lastOrderTime, exists := e.recentOrders[key]
+	e.recentOrdersMu.RUnlock()
+	
+	if !exists {
+		return false
+	}
+	
+	return time.Since(lastOrderTime) < 5*time.Minute
+}
+
+func (e *Engine) recordOrder(code, action string) {
+	key := fmt.Sprintf("%s:%s", code, action)
+	
+	e.recentOrdersMu.Lock()
+	defer e.recentOrdersMu.Unlock()
+	
+	e.recentOrders[key] = time.Now()
+	
+	for k, t := range e.recentOrders {
+		if time.Since(t) > 10*time.Minute {
+			delete(e.recentOrders, k)
+		}
+	}
 }
 
 func (a *AgentWorker) Stop() {
