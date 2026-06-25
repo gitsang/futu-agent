@@ -116,14 +116,23 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message) (string
 }
 
 func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo, tradingStrategy string, rules config.AgentRules) (*TradeDecision, error) {
-	aggressionDesc := "保守"
-	if rules.AggressionLevel == "aggressive" {
+	var aggressionDesc, goalDesc, actionBias string
+	switch rules.AggressionLevel {
+	case "aggressive":
 		aggressionDesc = "激进"
-	} else if rules.AggressionLevel == "moderate" {
-		aggressionDesc = "适中"
+		goalDesc = "你的目标是通过频繁交易最大化收益"
+		actionBias = "积极寻找交易机会"
+	case "moderate":
+		aggressionDesc = "稳健"
+		goalDesc = "你的目标是在风险可控的前提下追求收益"
+		actionBias = "在机会明确时果断行动"
+	default: // conservative
+		aggressionDesc = "保守"
+		goalDesc = "你的目标是保护本金，谨慎参与"
+		actionBias = "只在高确定性机会出现时行动"
 	}
 
-	systemPrompt := fmt.Sprintf(`你是一个%s的AI交易代理，用于模拟交易。你的目标是通过积极交易最大化收益。
+	systemPrompt := fmt.Sprintf(`你是一个%s的AI交易代理，用于模拟交易。%s。
 
 输出以下JSON格式的决策：
 {
@@ -143,7 +152,7 @@ func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, ac
 2. 涨幅超过%.1f%%时考虑止盈
 3. 亏损超过%.1f%%时考虑止损
 4. 每次交易使用%d-%d%%的可用资金
-5. 频繁交易，不要只是持有！
+5. %s
 6. 使用技术指标：成交量、价格动量、支撑阻力位
 7. 如果现金超过总资产的%d%%，必须找到买入机会
 8. 如果持仓亏损超过%.1f%%，考虑加仓或止损
@@ -154,19 +163,22 @@ func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, ac
 规则：
 1. 只输出有效的JSON，不要输出其他文本
 2. 如果现金超过总资产的%d%%，绝不能输出HOLD - 必须找到买入机会！
-3. 果断决策 - 每个交易周期都要做出决策
+3. %s
 4. 模拟交易时，偏向行动而非不行动`,
 		aggressionDesc,
+		goalDesc,
 		tradingStrategy,
 		rules.BuyOnDipThreshold,
 		rules.TakeProfitThreshold,
 		rules.StopLossThreshold,
 		rules.CashUsageMin,
 		rules.CashUsageMax,
+		actionBias,
 		rules.MaxCashRatio,
 		rules.PositionLossThreshold,
 		rules.LotSizeRule,
-		rules.MaxCashRatio)
+		rules.MaxCashRatio,
+		actionBias)
 
 	userPrompt := fmt.Sprintf(`当前市场数据：
 %s
@@ -177,7 +189,7 @@ func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, ac
 账户信息：
 %s
 
-请分析并提供JSON格式的交易决策。记住：要%s，积极交易！`, marketData, positions, accountInfo, aggressionDesc)
+请分析并提供JSON格式的交易决策。`, marketData, positions, accountInfo)
 
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},
