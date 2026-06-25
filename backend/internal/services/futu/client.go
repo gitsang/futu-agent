@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"math"
 	"sync"
 	"time"
 
@@ -238,6 +239,8 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 						unrealizedPnL = (pos.CurPrice - pos.CostPrice) * pos.Quantity
 					}
 					
+					unrealizedPnL = math.Round(unrealizedPnL*100) / 100
+					
 					result = append(result, Position{
 						Code:          pos.Code,
 						Market:        marketStr,
@@ -271,6 +274,8 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 				if unrealizedPnL == 0 && pos.CostPrice > 0 && pos.CurPrice > 0 {
 					unrealizedPnL = (pos.CurPrice - pos.CostPrice) * pos.Quantity
 				}
+				
+				unrealizedPnL = math.Round(unrealizedPnL*100) / 100
 				
 				result = append(result, Position{
 					Code:          pos.Code,
