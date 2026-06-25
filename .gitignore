@@ -53,3 +53,4 @@ temp/
 
 # Agents
 .sisyphus
+.worktrees
