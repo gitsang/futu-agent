@@ -23,15 +23,41 @@ type AgentRules struct {
 	LotSizeRule           string  `yaml:"lot_size_rule" json:"lot_size_rule"`
 }
 
+type StockUniverseConfig struct {
+	Source       string                 `yaml:"source"`
+	ScreenConfig StockUniverseScreenConfig `yaml:"screen_config"`
+	Watchlist    []string               `yaml:"watchlist"`
+}
+
+type StockUniverseScreenConfig struct {
+	Market  string                       `yaml:"market"`
+	Filters []StockUniverseFilterConfig  `yaml:"filters"`
+	Sort    []StockUniverseSortConfig    `yaml:"sort"`
+	Limit   int                          `yaml:"limit"`
+}
+
+type StockUniverseFilterConfig struct {
+	Field    string  `yaml:"field"`
+	Operator string  `yaml:"operator"`
+	Value    float64 `yaml:"value"`
+	Unit     string  `yaml:"unit"`
+}
+
+type StockUniverseSortConfig struct {
+	Field     string `yaml:"field"`
+	Direction string `yaml:"direction"`
+}
+
 type AgentConfig struct {
-	ID              string      `yaml:"id" json:"id"`
-	Market          string      `yaml:"market" json:"market"`
-	Name            string      `yaml:"name" json:"name"`
-	Description     string      `yaml:"description" json:"description"`
-	LLMModel        string      `yaml:"llm_model" json:"llm_model"`
-	TradingStrategy string      `yaml:"trading_strategy" json:"trading_strategy"`
-	Enabled         bool        `yaml:"enabled" json:"enabled"`
-	Rules           AgentRules  `yaml:"rules" json:"rules"`
+	ID              string              `yaml:"id" json:"id"`
+	Market          string              `yaml:"market" json:"market"`
+	Name            string              `yaml:"name" json:"name"`
+	Description     string              `yaml:"description" json:"description"`
+	LLMModel        string              `yaml:"llm_model" json:"llm_model"`
+	TradingStrategy string              `yaml:"trading_strategy" json:"trading_strategy"`
+	Enabled         bool                `yaml:"enabled" json:"enabled"`
+	Rules           AgentRules          `yaml:"rules" json:"rules"`
+	StockUniverse   StockUniverseConfig `yaml:"stock_universe"`
 }
 
 type AgentsConfig struct {
