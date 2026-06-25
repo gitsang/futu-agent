@@ -214,11 +214,26 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		}
 
 		minPrice, maxPrice, minVolume := screenFilters(stockUniverse.ScreenConfig.Filters)
-		candidates, err = e.futuClient.ScreenStocks(ctx, screenMarket, minPrice, maxPrice, minVolume)
-		if err != nil {
-			log.Printf("Failed to screen stocks for agent %s: %v", worker.AgentID, err)
-			return
+		
+		// 添加重试逻辑，应对频率限制
+		maxRetries := 3
+		for retry := 0; retry < maxRetries; retry++ {
+			candidates, err = e.futuClient.ScreenStocks(ctx, screenMarket, minPrice, maxPrice, minVolume)
+			if err == nil {
+				break
+			}
+			log.Printf("选股失败 (重试 %d/%d): %v", retry+1, maxRetries, err)
+			if retry < maxRetries-1 {
+				time.Sleep(time.Duration(retry+1) * 10 * time.Second)
+			}
 		}
+		
+		if err != nil {
+			log.Printf("选股最终失败，使用默认股票池: %v", err)
+			// 使用默认股票池作为降级策略
+			candidates = e.getDefaultCandidates(market)
+		}
+		
 		if stockUniverse.ScreenConfig.Limit > 0 && len(candidates) > stockUniverse.ScreenConfig.Limit {
 			candidates = candidates[:stockUniverse.ScreenConfig.Limit]
 		}
@@ -451,6 +466,55 @@ func (e *Engine) recordOrder(code, action string) {
 			delete(e.recentOrders, k)
 		}
 	}
+}
+
+func (e *Engine) getDefaultCandidates(market string) []futu.StockScreener {
+	defaultStocks := map[string][]futu.StockScreener{
+		"US": {
+			{Code: "AAPL", Name: "Apple"},
+			{Code: "MSFT", Name: "Microsoft"},
+			{Code: "GOOGL", Name: "Alphabet"},
+			{Code: "AMZN", Name: "Amazon"},
+			{Code: "NVDA", Name: "NVIDIA"},
+			{Code: "META", Name: "Meta"},
+			{Code: "TSLA", Name: "Tesla"},
+			{Code: "JPM", Name: "JPMorgan"},
+			{Code: "V", Name: "Visa"},
+			{Code: "JNJ", Name: "Johnson & Johnson"},
+		},
+		"HK": {
+			{Code: "00700", Name: "腾讯控股"},
+			{Code: "09988", Name: "阿里巴巴-SW"},
+			{Code: "03690", Name: "美团-W"},
+			{Code: "09999", Name: "网易-S"},
+			{Code: "01810", Name: "小米集团-W"},
+			{Code: "00005", Name: "汇丰控股"},
+			{Code: "00941", Name: "中国移动"},
+			{Code: "02318", Name: "中国平安"},
+			{Code: "00388", Name: "香港交易所"},
+			{Code: "01299", Name: "友邦保险"},
+		},
+		"CN": {
+			{Code: "600519", Name: "贵州茅台"},
+			{Code: "601318", Name: "中国平安"},
+			{Code: "600036", Name: "招商银行"},
+			{Code: "000858", Name: "五粮液"},
+			{Code: "000333", Name: "美的集团"},
+			{Code: "601166", Name: "兴业银行"},
+			{Code: "600276", Name: "恒瑞医药"},
+			{Code: "000002", Name: "万科A"},
+			{Code: "600030", Name: "中信证券"},
+			{Code: "002415", Name: "海康威视"},
+		},
+	}
+	
+	if stocks, ok := defaultStocks[market]; ok {
+		log.Printf("使用默认股票池: %d 只股票", len(stocks))
+		return stocks
+	}
+	
+	log.Printf("未找到市场 %s 的默认股票池", market)
+	return []futu.StockScreener{}
 }
 
 func (a *AgentWorker) Stop() {
