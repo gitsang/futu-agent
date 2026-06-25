@@ -94,8 +94,8 @@ func (c *QuoteCache) Clear() {
 
 type CachedClient struct {
 	*Client
-	quoteCache  *QuoteCache
-	fundsCache  *QuoteCache
+	quoteCache    *QuoteCache
+	fundsCache    *QuoteCache
 	positionCache *QuoteCache
 }
 
@@ -107,9 +107,9 @@ func NewCachedClient(host string, port int) (*CachedClient, error) {
 
 	return &CachedClient{
 		Client:        client,
-		quoteCache:    NewQuoteCache(30 * time.Second),  // Quotes cached for 30s
-		fundsCache:    NewQuoteCache(60 * time.Second),   // Funds cached for 60s
-		positionCache: NewQuoteCache(30 * time.Second),   // Positions cached for 30s
+		quoteCache:    NewQuoteCache(30 * time.Second), // Quotes cached for 30s
+		fundsCache:    NewQuoteCache(60 * time.Second), // Funds cached for 60s
+		positionCache: NewQuoteCache(30 * time.Second), // Positions cached for 30s
 	}, nil
 }
 

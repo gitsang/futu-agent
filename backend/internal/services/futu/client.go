@@ -8,9 +8,10 @@ import (
 	"sync"
 	"time"
 
-	futuapi "github.com/shing1211/futuapi4go/pkg/futuapi"
 	"github.com/shing1211/futuapi4go/client"
 	"github.com/shing1211/futuapi4go/pkg/constant"
+	futuapi "github.com/shing1211/futuapi4go/pkg/futuapi"
+	"github.com/shing1211/futuapi4go/pkg/pb/qotstockfilter"
 )
 
 var marketMap = map[string]constant.TrdMarket{
@@ -74,7 +75,7 @@ func (c *Client) discoverAccounts() error {
 
 	for _, acc := range accounts {
 		log.Printf("  Account %d: markets=%v, env=%d", acc.AccID, acc.TrdMarketAuthList, acc.TrdEnv)
-		
+
 		for _, market := range acc.TrdMarketAuthList {
 			switch constant.TrdMarket(market) {
 			case constant.TrdMarket_HK:
@@ -214,7 +215,7 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 	}
 
 	var result []Position
-	
+
 	if market == "" || market == "ALL" {
 		seen := make(map[uint64]bool)
 		for _, accIDs := range c.accMap {
@@ -223,7 +224,7 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 					continue
 				}
 				seen[accID] = true
-				
+
 				positions, err := client.GetPositionList(ctx, c.sdkClient, accID)
 				if err != nil {
 					log.Printf("Failed to get positions for accID %d: %v", accID, err)
@@ -233,14 +234,14 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 				for _, pos := range positions {
 					marketStr := marketFromCode(pos.Code)
 					unrealizedPnL := pos.UnrealizedPL
-					
+
 					// Calculate PnL if not provided by SDK
 					if unrealizedPnL == 0 && pos.CostPrice > 0 && pos.CurPrice > 0 {
 						unrealizedPnL = (pos.CurPrice - pos.CostPrice) * pos.Quantity
 					}
-					
+
 					unrealizedPnL = math.Round(unrealizedPnL*100) / 100
-					
+
 					result = append(result, Position{
 						Code:          pos.Code,
 						Market:        marketStr,
@@ -269,14 +270,14 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 			for _, pos := range positions {
 				marketStr := marketFromCode(pos.Code)
 				unrealizedPnL := pos.UnrealizedPL
-				
+
 				// Calculate PnL if not provided by SDK
 				if unrealizedPnL == 0 && pos.CostPrice > 0 && pos.CurPrice > 0 {
 					unrealizedPnL = (pos.CurPrice - pos.CostPrice) * pos.Quantity
 				}
-				
+
 				unrealizedPnL = math.Round(unrealizedPnL*100) / 100
-				
+
 				result = append(result, Position{
 					Code:          pos.Code,
 					Market:        marketStr,
@@ -461,19 +462,159 @@ type StockScreener struct {
 	PB          float64 `json:"pb"`
 }
 
+type StockCandidate struct {
+	Code      string  `json:"code"`
+	Market    string  `json:"market"`
+	Name      string  `json:"name"`
+	Price     float64 `json:"price"`
+	ChangePct float64 `json:"change_pct"`
+	Volume    int64   `json:"volume"`
+	Turnover  float64 `json:"turnover"`
+	MarketCap float64 `json:"market_cap"`
+	PE        float64 `json:"pe"`
+	PB        float64 `json:"pb"`
+}
+
 func (c *Client) ScreenStocks(ctx context.Context, market string, minPrice, maxPrice float64, minVolume int64) ([]StockScreener, error) {
 	if !c.IsConnected() {
 		return nil, fmt.Errorf("not connected to Futu OpenD")
 	}
 
-	marketConst, ok := marketMap[market]
+	markets, ok := screenMarkets(market)
 	if !ok {
 		return nil, fmt.Errorf("unsupported market: %s", market)
 	}
 
-	_ = marketConst
-	result := make([]StockScreener, 0)
+	const pageSize int32 = 100
+	result := make([]StockScreener, 0, pageSize)
+	for _, marketConst := range markets {
+		for begin := int32(0); ; begin += pageSize {
+			stocks, err := client.StockFilter(ctx, c.sdkClient, marketConst, begin, pageSize)
+			if err != nil {
+				return nil, fmt.Errorf("StockFilter failed for %s: %w", market, err)
+			}
+
+			for _, stock := range stocks {
+				candidate := stockFilterResultToCandidate(stock)
+				if !candidateMatches(candidate, minPrice, maxPrice, minVolume) {
+					continue
+				}
+				result = append(result, candidateToScreener(candidate))
+			}
+
+			if len(stocks) < int(pageSize) {
+				break
+			}
+		}
+	}
+
 	return result, nil
+}
+
+func screenMarkets(market string) ([]constant.Market, bool) {
+	switch market {
+	case "HK":
+		return []constant.Market{constant.Market_HK}, true
+	case "US":
+		return []constant.Market{constant.Market_US}, true
+	case "CN":
+		return []constant.Market{constant.Market_SH, constant.Market_SZ}, true
+	default:
+		return nil, false
+	}
+}
+
+func stockFilterResultToCandidate(stock *client.StockFilterResult) StockCandidate {
+	if stock == nil {
+		return StockCandidate{}
+	}
+
+	candidate := StockCandidate{
+		Name:      stock.Name,
+		Price:     stock.CurPrice,
+		ChangePct: stock.ChangeRate,
+		Volume:    stock.Volume,
+		Turnover:  stock.Turnover,
+	}
+	if stock.Security != nil {
+		candidate.Code = stock.Security.GetCode()
+		candidate.Market = marketFromFutuMarket(stock.Security.GetMarket())
+	}
+
+	for _, data := range stock.BaseDataList {
+		if data == nil {
+			continue
+		}
+		value := data.GetValue()
+		switch qotstockfilter.StockField(data.GetFieldName()) {
+		case qotstockfilter.StockField_StockField_CurPrice:
+			candidate.Price = value
+		case qotstockfilter.StockField_StockField_MarketVal:
+			candidate.MarketCap = value
+		case qotstockfilter.StockField_StockField_PeAnnual, qotstockfilter.StockField_StockField_PeTTM:
+			candidate.PE = value
+		case qotstockfilter.StockField_StockField_PbRate:
+			candidate.PB = value
+		}
+	}
+
+	for _, data := range stock.AccumulateDataList {
+		if data == nil {
+			continue
+		}
+		value := data.GetValue()
+		switch qotstockfilter.AccumulateField(data.GetFieldName()) {
+		case qotstockfilter.AccumulateField_AccumulateField_ChangeRate:
+			candidate.ChangePct = value
+		case qotstockfilter.AccumulateField_AccumulateField_Volume:
+			candidate.Volume = int64(value)
+		case qotstockfilter.AccumulateField_AccumulateField_Turnover:
+			candidate.Turnover = value
+		}
+	}
+
+	return candidate
+}
+
+func candidateMatches(candidate StockCandidate, minPrice, maxPrice float64, minVolume int64) bool {
+	if minPrice > 0 && candidate.Price < minPrice {
+		return false
+	}
+	if maxPrice > 0 && candidate.Price > maxPrice {
+		return false
+	}
+	if minVolume > 0 && candidate.Volume < minVolume {
+		return false
+	}
+	return true
+}
+
+func candidateToScreener(candidate StockCandidate) StockScreener {
+	return StockScreener{
+		Code:        candidate.Code,
+		Market:      candidate.Market,
+		Name:        candidate.Name,
+		Price:       candidate.Price,
+		ChangePct:   candidate.ChangePct,
+		Volume:      candidate.Volume,
+		Turnover:    candidate.Turnover,
+		MarketValue: candidate.MarketCap,
+		PE:          candidate.PE,
+		PB:          candidate.PB,
+	}
+}
+
+func marketFromFutuMarket(market int32) string {
+	switch constant.Market(market) {
+	case constant.Market_HK:
+		return "HK"
+	case constant.Market_US:
+		return "US"
+	case constant.Market_SH, constant.Market_SZ:
+		return "CN"
+	default:
+		return ""
+	}
 }
 
 func (c *Client) GetTradeHistory(ctx context.Context, market string, days int) ([]Order, error) {
@@ -604,15 +745,15 @@ func marketFromCode(code string) string {
 	if len(code) == 0 {
 		return "UNKNOWN"
 	}
-	
+
 	if len(code) == 6 && (code[0] == '6' || code[0] == '0' || code[0] == '3') {
 		return "CN"
 	}
-	
+
 	if len(code) == 5 && code[0] == '0' {
 		return "HK"
 	}
-	
+
 	if len(code) >= 1 && len(code) <= 5 {
 		allUpper := true
 		for _, ch := range code {
@@ -625,7 +766,7 @@ func marketFromCode(code string) string {
 			return "US"
 		}
 	}
-	
+
 	return "UNKNOWN"
 }
 
@@ -646,20 +787,20 @@ type Quote struct {
 }
 
 type Order struct {
-	OrderID      string  `json:"order_id"`
-	Code         string  `json:"code"`
-	Name         string  `json:"name"`
-	Market       string  `json:"market"`
-	Side         string  `json:"side"`
-	OrderType    string  `json:"order_type"`
-	Status       string  `json:"status"`
-	Price        float64 `json:"price"`
-	Qty          float64 `json:"qty"`
-	FillQty      float64 `json:"fill_qty"`
-	FillPrice    float64 `json:"fill_price"`
-	CreateTime   string  `json:"create_time"`
-	UpdateTime   string  `json:"update_time"`
-	Remark       string  `json:"remark"`
+	OrderID    string  `json:"order_id"`
+	Code       string  `json:"code"`
+	Name       string  `json:"name"`
+	Market     string  `json:"market"`
+	Side       string  `json:"side"`
+	OrderType  string  `json:"order_type"`
+	Status     string  `json:"status"`
+	Price      float64 `json:"price"`
+	Qty        float64 `json:"qty"`
+	FillQty    float64 `json:"fill_qty"`
+	FillPrice  float64 `json:"fill_price"`
+	CreateTime string  `json:"create_time"`
+	UpdateTime string  `json:"update_time"`
+	Remark     string  `json:"remark"`
 }
 
 type OrderResult struct {
@@ -679,12 +820,12 @@ type TradingStats struct {
 }
 
 type MarketOverview struct {
-	Market       string  `json:"market"`
-	StockCount   int     `json:"stock_count"`
-	TotalPnL     float64 `json:"total_pnl"`
-	TotalValue   float64 `json:"total_value"`
-	TodayPnL     float64 `json:"today_pnl"`
-	TodayTrades  int     `json:"today_trades"`
+	Market      string  `json:"market"`
+	StockCount  int     `json:"stock_count"`
+	TotalPnL    float64 `json:"total_pnl"`
+	TotalValue  float64 `json:"total_value"`
+	TodayPnL    float64 `json:"today_pnl"`
+	TodayTrades int     `json:"today_trades"`
 }
 
 func (c *Client) GetTradingStats(ctx context.Context, market string) (*TradingStats, error) {
