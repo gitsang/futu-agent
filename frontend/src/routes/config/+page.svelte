@@ -36,6 +36,10 @@
 	);
 
 	async function toggleAgent(agent: Agent) {
+		const action = agent.enabled ? '禁用' : '启用';
+		const confirmed = confirm(`确定要${action}代理 "${agent.name}" 吗？`);
+		if (!confirmed) return;
+
 		try {
 			await api.updateAgent(agent.id, { enabled: !agent.enabled });
 			agents = agents.map((a) =>
