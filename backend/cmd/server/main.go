@@ -30,7 +30,7 @@ func main() {
 
 	memoryStore := store.NewMemoryStore()
 
-	futuClient, err := futu.NewClient(cfg.FutuOpendHost, cfg.FutuOpendPort)
+	futuClient, err := futu.NewCachedClient(cfg.FutuOpendHost, cfg.FutuOpendPort)
 	if err != nil {
 		log.Fatalf("Failed to create Futu client: %v", err)
 	}

@@ -17,7 +17,7 @@ import (
 
 type Engine struct {
 	store          *store.MemoryStore
-	futuClient     *futu.Client
+	futuClient     *futu.CachedClient
 	llmClient      *llm.Client
 	config         *config.Config
 	agents         map[string]*AgentWorker
@@ -36,7 +36,7 @@ type AgentWorker struct {
 	mu      sync.Mutex
 }
 
-func NewEngine(store *store.MemoryStore, futuClient *futu.Client, llmClient *llm.Client, cfg *config.Config) *Engine {
+func NewEngine(store *store.MemoryStore, futuClient *futu.CachedClient, llmClient *llm.Client, cfg *config.Config) *Engine {
 	return &Engine{
 		store:          store,
 		futuClient:     futuClient,

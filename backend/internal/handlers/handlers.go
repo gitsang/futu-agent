@@ -19,10 +19,10 @@ type Handler struct {
 	store       *store.MemoryStore
 	cfg         *config.Config
 	agentEngine *agent.Engine
-	futuClient  *futu.Client
+	futuClient  *futu.CachedClient
 }
 
-func NewHandler(store *store.MemoryStore, cfg *config.Config, agentEngine *agent.Engine, futuClient *futu.Client) *Handler {
+func NewHandler(store *store.MemoryStore, cfg *config.Config, agentEngine *agent.Engine, futuClient *futu.CachedClient) *Handler {
 	return &Handler{
 		store:       store,
 		cfg:         cfg,
