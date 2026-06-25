@@ -115,7 +115,7 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message) (string
 	return chatResp.Choices[0].Message.Content, nil
 }
 
-func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo, tradingStrategy string, rules config.AgentRules) (*TradeDecision, error) {
+func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo, candidates, tradingStrategy string, rules config.AgentRules) (*TradeDecision, error) {
 	var aggressionDesc, goalDesc, actionBias string
 	switch rules.AggressionLevel {
 	case "aggressive":
@@ -157,6 +157,12 @@ func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, ac
 7. 如果现金超过总资产的%d%%，必须找到买入机会
 8. 如果持仓亏损超过%.1f%%，考虑加仓或止损
 
+候选股票分析：
+9. 除了当前持仓，你还会收到从全市场筛选的候选股票列表
+10. 候选股票是根据价格、市值、PE等条件筛选的潜在投资目标
+11. 如果当前持仓表现不佳或现金充足，优先考虑从候选列表中选择买入目标
+12. 选择候选股票时，关注：估值合理性（PE/PB）、流动性（成交量）、趋势（涨跌幅）
+
 手数规则（必须遵守）：
 - %s
 
@@ -189,7 +195,10 @@ func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, ac
 账户信息：
 %s
 
-请分析并提供JSON格式的交易决策。`, marketData, positions, accountInfo)
+候选股票（从全市场筛选）：
+%s
+
+请分析并提供JSON格式的交易决策。`, marketData, positions, accountInfo, candidates)
 
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},

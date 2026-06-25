@@ -146,6 +146,25 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		return
 	}
 
+	stockUniverse := worker.Config.StockUniverse
+	candidates := []futu.StockScreener{}
+	if stockUniverse.Source == "screen" {
+		screenMarket := stockUniverse.ScreenConfig.Market
+		if screenMarket == "" {
+			screenMarket = market
+		}
+
+		minPrice, maxPrice, minVolume := screenFilters(stockUniverse.ScreenConfig.Filters)
+		candidates, err = e.futuClient.ScreenStocks(ctx, screenMarket, minPrice, maxPrice, minVolume)
+		if err != nil {
+			log.Printf("Failed to screen stocks for agent %s: %v", worker.AgentID, err)
+			return
+		}
+		if stockUniverse.ScreenConfig.Limit > 0 && len(candidates) > stockUniverse.ScreenConfig.Limit {
+			candidates = candidates[:stockUniverse.ScreenConfig.Limit]
+		}
+	}
+
 	var marketDataLines []string
 	marketDataLines = append(marketDataLines, fmt.Sprintf("=== %s市场数据 ===", market))
 	marketDataLines = append(marketDataLines, "")
@@ -176,18 +195,28 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 			}
 		}
 	}
+	if len(candidates) > 0 {
+		marketDataLines = append(marketDataLines, "")
+		marketDataLines = append(marketDataLines, "【候选股票（从全市场筛选）】")
+		for _, candidate := range candidates {
+			marketDataLines = append(marketDataLines, fmt.Sprintf("- %s (%s): 现价%.2f, 涨跌幅%.2f%%, PE=%.1f, PB=%.1f, 市值%.0f亿",
+				candidate.Name, candidate.Code, candidate.Price, candidate.ChangePct, candidate.PE, candidate.PB, candidate.MarketValue))
+		}
+	}
 
 	marketData := strings.Join(marketDataLines, "\n")
 
 	positionsJSON, _ := json.Marshal(positions)
 	accountJSON, _ := json.Marshal(accountFunds)
+	candidatesJSON, _ := json.Marshal(candidates)
 
 	tradingStrategy := worker.Config.TradingStrategy
 	if tradingStrategy == "" {
 		tradingStrategy = "基于技术分析的通用交易策略"
 	}
 
-	decision, err := e.llmClient.AnalyzeAndDecide(ctx, marketData, string(positionsJSON), string(accountJSON), tradingStrategy, worker.Config.Rules)
+	candidatesText := string(candidatesJSON)
+	decision, err := e.llmClient.AnalyzeAndDecide(ctx, marketData, string(positionsJSON), string(accountJSON), candidatesText, tradingStrategy, worker.Config.Rules)
 	if err != nil {
 		log.Printf("Agent %s failed to analyze: %v", worker.AgentID, err)
 		return
@@ -218,6 +247,28 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		Reason:    decision.Reason,
 		Executed:  true,
 	})
+}
+
+func screenFilters(filters []config.StockUniverseFilterConfig) (float64, float64, int64) {
+	var minPrice, maxPrice float64
+	var minVolume int64
+	for _, filter := range filters {
+		switch filter.Field {
+		case "price":
+			switch filter.Operator {
+			case ">", ">=":
+				minPrice = filter.Value
+			case "<", "<=":
+				maxPrice = filter.Value
+			}
+		case "volume":
+			switch filter.Operator {
+			case ">", ">=":
+				minVolume = int64(filter.Value)
+			}
+		}
+	}
+	return minPrice, maxPrice, minVolume
 }
 
 func (e *Engine) GetFutuOpendStatus() string {
