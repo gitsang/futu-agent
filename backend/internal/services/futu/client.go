@@ -279,6 +279,15 @@ func (c *Client) PlaceOrder(ctx context.Context, market, code, side string, pric
 		return "", fmt.Errorf("not connected to Futu OpenD")
 	}
 
+	// A-shares require orders in multiples of 100 shares
+	if market == "CN" && quantity%100 != 0 {
+		quantity = (quantity / 100) * 100 // Round down to nearest 100
+		if quantity == 0 {
+			return "", fmt.Errorf("quantity too small, minimum 100 shares for A-shares")
+		}
+		log.Printf("Adjusted A-share quantity to %d (must be multiple of 100)", quantity)
+	}
+
 	accIDs := c.accMap[market]
 	if len(accIDs) == 0 {
 		accIDs = []uint64{c.accID}
@@ -421,33 +430,77 @@ func (c *Client) GetOrders(ctx context.Context, market string) ([]Order, error) 
 }
 
 func convertOrder(o client.Order) Order {
+	// TrdSide: 0=Unknown, 1=Buy, 2=Sell, 3=SellShort, 4=BuyBack
 	side := "BUY"
 	if o.TrdSide == 2 {
 		side = "SELL"
+	} else if o.TrdSide == 3 {
+		side = "SELL_SHORT"
+	} else if o.TrdSide == 4 {
+		side = "BUY_BACK"
 	}
 
-	orderType := "NORMAL"
+	// OrderType: 0=Unknown, 1=Normal(限价), 2=Market(市价), 5=AbsoluteLimit, 6=Auction, 7=AuctionLimit,
+	// 8=SpecialLimit, 9=SpecialLimit_All, 10=Stop, 11=StopLimit, 12=MarketIfTouched, 13=LimitIfTouched,
+	// 14=TrailingStop, 15=TrailingStopLimit, 16=TWAP, 17=TWAP_LIMIT, 18=VWAP, 19=VWAP_LIMIT
+	orderType := "UNKNOWN"
 	switch o.OrderType {
 	case 1:
-		orderType = "MARKET"
+		orderType = "NORMAL" // 限价单
 	case 2:
+		orderType = "MARKET" // 市价单
+	case 5:
+		orderType = "ABSOLUTE_LIMIT"
+	case 6:
+		orderType = "AUCTION"
+	case 7:
+		orderType = "AUCTION_LIMIT"
+	case 8:
+		orderType = "SPECIAL_LIMIT"
+	case 9:
+		orderType = "SPECIAL_LIMIT_ALL"
+	case 10:
 		orderType = "STOP"
+	case 11:
+		orderType = "STOP_LIMIT"
+	case 12:
+		orderType = "MARKET_IF_TOUCHED"
+	case 13:
+		orderType = "LIMIT_IF_TOUCHED"
+	case 14:
+		orderType = "TRAILING_STOP"
+	case 15:
+		orderType = "TRAILING_STOP_LIMIT"
 	}
 
+	// OrderStatus: -1=Unknown, 1=WaitingSubmit, 2=Submitting, 5=Submitted, 10=Filled_Part,
+	// 11=Filled_All, 14=Cancelled_Part, 15=Cancelled_All, 21=Failed, 22=Disabled, 23=Deleted, 24=FillCancelled
 	status := "UNKNOWN"
 	switch o.OrderStatus {
+	case -1:
+		status = "UNKNOWN"
 	case 1:
-		status = "PENDING"
+		status = "WAITING_SUBMIT" // 待提交
 	case 2:
-		status = "SUBMITTED"
-	case 3:
-		status = "FILLED"
-	case 4:
-		status = "CANCELLED"
+		status = "SUBMITTING" // 提交中
 	case 5:
-		status = "FAILED"
-	case 6:
-		status = "EXPIRED"
+		status = "SUBMITTED" // 已提交，等待成交
+	case 10:
+		status = "FILLED_PART" // 部分成交
+	case 11:
+		status = "FILLED_ALL" // 全部已成
+	case 14:
+		status = "CANCELLED_PART" // 部分成交，剩余已撤单
+	case 15:
+		status = "CANCELLED_ALL" // 全部已撤单
+	case 21:
+		status = "FAILED" // 下单失败
+	case 22:
+		status = "DISABLED" // 已失效
+	case 23:
+		status = "DELETED" // 已删除
+	case 24:
+		status = "FILL_CANCELLED" // 成交被撤销
 	}
 
 	market := marketFromCode(o.Code)

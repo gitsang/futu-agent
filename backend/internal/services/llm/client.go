@@ -137,6 +137,11 @@ Trading Strategy:
 8. If you have > 70% cash, you MUST find something to buy
 9. If a position is down > 3%, consider averaging down or cutting loss
 
+IMPORTANT LOT SIZE RULES:
+- CN (A-shares): quantity MUST be a multiple of 100 (e.g., 100, 200, 300, 1000)
+- HK (港股): quantity depends on stock's lot size (usually 100, 200, 400, 500, 1000, 2000)
+- US (美股): quantity can be any positive integer (fractional shares not supported)
+
 Rules:
 1. Only output valid JSON, no other text
 2. Never output HOLD if cash > 70% of total assets - find something to buy!

@@ -28,23 +28,37 @@
 
 	function getStatusColor(status: string): 'success' | 'destructive' | 'warning' | 'default' {
 		switch (status) {
-			case 'FILLED': return 'success';
-			case 'CANCELLED': return 'destructive';
-			case 'FAILED': return 'destructive';
-			case 'PENDING': return 'warning';
-			case 'SUBMITTED': return 'warning';
-			default: return 'default';
+			case 'FILLED_ALL':
+			case 'FILLED_PART':
+				return 'success';
+			case 'CANCELLED_ALL':
+			case 'CANCELLED_PART':
+			case 'FAILED':
+			case 'FILL_CANCELLED':
+				return 'destructive';
+			case 'WAITING_SUBMIT':
+			case 'SUBMITTING':
+			case 'SUBMITTED':
+				return 'warning';
+			default:
+				return 'default';
 		}
 	}
 
 	function getStatusLabel(status: string): string {
 		switch (status) {
-			case 'PENDING': return '待提交';
+			case 'UNKNOWN': return '未知';
+			case 'WAITING_SUBMIT': return '待提交';
+			case 'SUBMITTING': return '提交中';
 			case 'SUBMITTED': return '已提交';
-			case 'FILLED': return '已成交';
-			case 'CANCELLED': return '已撤单';
+			case 'FILLED_PART': return '部分成交';
+			case 'FILLED_ALL': return '已成交';
+			case 'CANCELLED_PART': return '部分撤单';
+			case 'CANCELLED_ALL': return '已撤单';
 			case 'FAILED': return '失败';
-			case 'EXPIRED': return '已过期';
+			case 'DISABLED': return '已失效';
+			case 'DELETED': return '已删除';
+			case 'FILL_CANCELLED': return '成交撤销';
 			default: return status;
 		}
 	}
