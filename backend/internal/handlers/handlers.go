@@ -192,6 +192,36 @@ func (h *Handler) GetStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) GetTradingStats(w http.ResponseWriter, r *http.Request) {
+	market := r.URL.Query().Get("market")
+	if market == "" {
+		market = "ALL"
+	}
+
+	if !validateMarket(market) {
+		respondError(w, http.StatusBadRequest, "Invalid market parameter")
+		return
+	}
+
+	stats, err := h.futuClient.GetTradingStats(r.Context(), market)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch trading stats")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, stats)
+}
+
+func (h *Handler) GetMarketOverview(w http.ResponseWriter, r *http.Request) {
+	overview, err := h.futuClient.GetMarketOverview(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch market overview")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, overview)
+}
+
 func (h *Handler) countEnabledAgents() int {
 	count := 0
 	for _, agent := range h.cfg.Agents {

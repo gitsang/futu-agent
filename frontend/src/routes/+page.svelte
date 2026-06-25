@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { AccountFunds, Decision, Position } from '$lib/types';
+	import type { AccountFunds, Decision, MarketOverview, Position, TradingStats } from '$lib/types';
 	import { formatCurrency, formatDate, cn } from '$lib/utils';
 	import { StatCard, Card, Badge, LoadingSpinner, Button } from '$lib/components';
 	import { selectedMarket } from '$lib/stores';
@@ -9,19 +9,25 @@
 	let allFunds = $state<AccountFunds[]>([]);
 	let positions = $state<Position[]>([]);
 	let decisions = $state<Decision[]>([]);
+	let tradingStats = $state<TradingStats | null>(null);
+	let marketOverview = $state<MarketOverview[]>([]);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
 
 	onMount(async () => {
 		try {
-			const [fundsData, positionsData, decisionsResult] = await Promise.all([
+			const [fundsData, positionsData, decisionsResult, statsData, overviewData] = await Promise.all([
 				api.getAllFunds(),
 				api.getPositions(),
-				api.getDecisions(undefined, 1, 5)
+				api.getDecisions(undefined, 1, 5),
+				api.getTradingStats(),
+				api.getMarketOverview()
 			]);
 			allFunds = fundsData;
 			positions = positionsData;
 			decisions = decisionsResult.data || [];
+			tradingStats = statsData;
+			marketOverview = overviewData;
 		} catch (e) {
 			error = e instanceof Error ? e.message : '加载失败';
 		} finally {
@@ -121,6 +127,48 @@
 			{loading}
 		/>
 	</div>
+
+	{#if tradingStats}
+		<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+			<Card>
+				<div class="text-sm text-text-muted">总订单数</div>
+				<div class="text-2xl font-semibold text-text-primary">{tradingStats.total_orders}</div>
+			</Card>
+			<Card>
+				<div class="text-sm text-text-muted">成交订单</div>
+				<div class="text-2xl font-semibold text-profit">{tradingStats.filled_orders}</div>
+			</Card>
+			<Card>
+				<div class="text-sm text-text-muted">成功率</div>
+				<div class="text-2xl font-semibold text-accent">{tradingStats.win_rate.toFixed(1)}%</div>
+			</Card>
+			<Card>
+				<div class="text-sm text-text-muted">总成交量</div>
+				<div class="text-2xl font-semibold text-text-primary">{tradingStats.total_volume.toLocaleString()}</div>
+			</Card>
+		</div>
+	{/if}
+
+	{#if marketOverview.length > 0}
+		<Card>
+			<h2 class="text-lg font-semibold text-text-primary mb-4">市场概览</h2>
+			<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+				{#each marketOverview as overview}
+					<div class="rounded-lg bg-surface-elevated p-4">
+						<div class="flex items-center justify-between mb-2">
+							<span class="font-medium text-text-primary">{overview.market}</span>
+							<Badge variant={overview.total_pnl >= 0 ? 'success' : 'destructive'}>
+								{overview.total_pnl >= 0 ? '+' : ''}{overview.total_pnl.toLocaleString()}
+							</Badge>
+						</div>
+						<div class="text-sm text-text-muted">
+							持仓: {overview.stock_count} 只 · 今日交易: {overview.today_trades} 笔
+						</div>
+					</div>
+				{/each}
+			</div>
+		</Card>
+	{/if}
 
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
 		<Card>

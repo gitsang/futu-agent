@@ -33,6 +33,12 @@
 
 	onMount(() => loadDecisions());
 
+	$effect(() => {
+		if ($selectedMarket) {
+			loadDecisions(1);
+		}
+	});
+
 	let filteredDecisions = $derived(
 		filter === 'all'
 			? decisions

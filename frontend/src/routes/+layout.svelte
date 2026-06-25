@@ -67,7 +67,6 @@
 
 		<div class="border-t border-border px-4 py-4 space-y-2">
 			<StatusIndicator status="online" label="服务运行中" />
-			<StatusIndicator status="online" label="数据库已连接" />
 			<StatusIndicator status="online" label="Futu OpenD 已连接" />
 		</div>
 	</aside>

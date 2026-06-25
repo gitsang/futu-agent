@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { AccountFunds, Agent, Decision, Order, PaginatedResponse, Position, SystemConfig, SystemStatus } from './types';
+import type { AccountFunds, Agent, Decision, MarketOverview, Order, PaginatedResponse, Position, SystemConfig, SystemStatus, TradingStats } from './types';
 
 const BASE_URL = browser ? '' : 'http://localhost:8080';
 
@@ -41,5 +41,8 @@ export const api = {
 		fetchApi<Agent>(`/agents/${id}`, { method: 'PUT', body: JSON.stringify(agent) }),
 
 	getConfig: () => fetchApi<SystemConfig>('/config'),
-	getStatus: () => fetchApi<SystemStatus>('/status')
+	getStatus: () => fetchApi<SystemStatus>('/status'),
+
+	getTradingStats: (market?: string) => fetchApi<TradingStats>(`/stats/trading${market ? `?market=${market}` : ''}`),
+	getMarketOverview: () => fetchApi<MarketOverview[]>('/stats/market'),
 };

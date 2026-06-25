@@ -612,3 +612,99 @@ type OrderResult struct {
 	OrderID   string
 	OrderIDEx string
 }
+
+type TradingStats struct {
+	TotalOrders      int     `json:"total_orders"`
+	FilledOrders     int     `json:"filled_orders"`
+	CancelledOrders  int     `json:"cancelled_orders"`
+	FailedOrders     int     `json:"failed_orders"`
+	TotalVolume      float64 `json:"total_volume"`
+	TotalTurnover    float64 `json:"total_turnover"`
+	WinRate          float64 `json:"win_rate"`
+	AvgHoldingPeriod float64 `json:"avg_holding_period"`
+}
+
+type MarketOverview struct {
+	Market       string  `json:"market"`
+	StockCount   int     `json:"stock_count"`
+	TotalPnL     float64 `json:"total_pnl"`
+	TotalValue   float64 `json:"total_value"`
+	TodayPnL     float64 `json:"today_pnl"`
+	TodayTrades  int     `json:"today_trades"`
+}
+
+func (c *Client) GetTradingStats(ctx context.Context, market string) (*TradingStats, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	orders, err := c.GetOrders(ctx, market)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &TradingStats{
+		TotalOrders: len(orders),
+	}
+
+	for _, order := range orders {
+		switch order.Status {
+		case "FILLED_ALL":
+			stats.FilledOrders++
+			stats.TotalVolume += order.FillQty
+			stats.TotalTurnover += order.FillPrice * order.FillQty
+		case "CANCELLED_ALL", "CANCELLED_PART":
+			stats.CancelledOrders++
+		case "FAILED":
+			stats.FailedOrders++
+		}
+	}
+
+	if stats.FilledOrders > 0 {
+		stats.WinRate = float64(stats.FilledOrders) / float64(stats.TotalOrders) * 100
+	}
+
+	return stats, nil
+}
+
+func (c *Client) GetMarketOverview(ctx context.Context) ([]MarketOverview, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	markets := []string{"CN", "HK", "US"}
+	result := make([]MarketOverview, 0, len(markets))
+
+	for _, market := range markets {
+		positions, err := c.GetPositions(ctx, market)
+		if err != nil {
+			continue
+		}
+
+		orders, err := c.GetOrders(ctx, market)
+		if err != nil {
+			continue
+		}
+
+		overview := MarketOverview{
+			Market:     market,
+			StockCount: len(positions),
+		}
+
+		for _, pos := range positions {
+			pnl := (pos.CurrentPrice - pos.AvgCost) * float64(pos.Quantity)
+			overview.TotalPnL += pnl
+			overview.TotalValue += pos.CurrentPrice * float64(pos.Quantity)
+		}
+
+		for _, order := range orders {
+			if order.Status == "FILLED_ALL" {
+				overview.TodayTrades++
+			}
+		}
+
+		result = append(result, overview)
+	}
+
+	return result, nil
+}

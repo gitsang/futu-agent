@@ -74,3 +74,23 @@ export interface PaginatedResponse {
 	total: number;
 	total_pages: number;
 }
+
+export interface TradingStats {
+	total_orders: number;
+	filled_orders: number;
+	cancelled_orders: number;
+	failed_orders: number;
+	total_volume: number;
+	total_turnover: number;
+	win_rate: number;
+	avg_holding_period: number;
+}
+
+export interface MarketOverview {
+	market: string;
+	stock_count: number;
+	total_pnl: number;
+	total_value: number;
+	today_pnl: number;
+	today_trades: number;
+}
