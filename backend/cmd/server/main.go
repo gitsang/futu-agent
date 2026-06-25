@@ -75,8 +75,10 @@ func main() {
 	}))
 
 	r.Route("/api", func(r chi.Router) {
+		r.Get("/health", handler.GetHealth)
 		r.Get("/account/funds", handler.GetAccountFunds)
 		r.Get("/account/funds/all", handler.GetAllAccountFunds)
+		r.Get("/account/info", handler.GetAccountInfo)
 		r.Get("/account/positions", handler.GetPositions)
 		r.Get("/account/orders", handler.GetOrders)
 

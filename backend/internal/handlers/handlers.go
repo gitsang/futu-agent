@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -93,7 +94,8 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetDecisions(w http.ResponseWriter, r *http.Request) {
-	// Pagination parameters
+	market := r.URL.Query().Get("market")
+	
 	pageStr := r.URL.Query().Get("page")
 	pageSizeStr := r.URL.Query().Get("page_size")
 
@@ -107,15 +109,13 @@ func (h *Handler) GetDecisions(w http.ResponseWriter, r *http.Request) {
 		pageSize = ps
 	}
 
-	// Legacy limit parameter support
 	limitStr := r.URL.Query().Get("limit")
 	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-		// If limit is provided, use it as pageSize for backward compatibility
 		pageSize = l
 		page = 1
 	}
 
-	result := h.store.GetDecisionsPaginated(page, pageSize)
+	result := h.store.GetDecisionsPaginated(page, pageSize, market)
 	respondJSON(w, http.StatusOK, result)
 }
 
@@ -238,6 +238,51 @@ func (h *Handler) GetTradeHistory(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondJSON(w, http.StatusOK, history)
+}
+
+func (h *Handler) GetHealth(w http.ResponseWriter, r *http.Request) {
+	health := map[string]interface{}{
+		"status":    "healthy",
+		"timestamp": time.Now().Format(time.RFC3339),
+		"services": map[string]string{
+			"futu_opend": h.agentEngine.GetFutuOpendStatus(),
+			"server":     "running",
+		},
+	}
+	respondJSON(w, http.StatusOK, health)
+}
+
+func (h *Handler) GetAccountInfo(w http.ResponseWriter, r *http.Request) {
+	funds, err := h.futuClient.GetAllAccountFunds(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch account info")
+		return
+	}
+
+	positions, err := h.futuClient.GetPositions(r.Context(), "ALL")
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch positions")
+		return
+	}
+
+	totalAssets := 0.0
+	totalCash := 0.0
+	totalMarketValue := 0.0
+	for _, f := range funds {
+		totalAssets += f.TotalAssets
+		totalCash += f.Cash
+		totalMarketValue += f.MarketValue
+	}
+
+	info := map[string]interface{}{
+		"total_assets":    totalAssets,
+		"total_cash":      totalCash,
+		"total_market_value": totalMarketValue,
+		"position_count":  len(positions),
+		"account_count":   len(funds),
+		"markets":         []string{"CN", "HK", "US"},
+	}
+	respondJSON(w, http.StatusOK, info)
 }
 
 func (h *Handler) countEnabledAgents() int {

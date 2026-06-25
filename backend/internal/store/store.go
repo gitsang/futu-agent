@@ -92,11 +92,24 @@ func (s *MemoryStore) GetDecisions(limit int) []TradeDecision {
 	return result
 }
 
-func (s *MemoryStore) GetDecisionsPaginated(page, pageSize int) PaginatedResponse {
+func (s *MemoryStore) GetDecisionsPaginated(page, pageSize int, market string) PaginatedResponse {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	total := len(s.decisions)
+	// Filter by market if specified
+	var filtered []TradeDecision
+	if market != "" && market != "ALL" {
+		filtered = make([]TradeDecision, 0)
+		for _, d := range s.decisions {
+			if d.Market == market {
+				filtered = append(filtered, d)
+			}
+		}
+	} else {
+		filtered = s.decisions
+	}
+
+	total := len(filtered)
 	totalPages := (total + pageSize - 1) / pageSize
 	if totalPages == 0 {
 		totalPages = 1
@@ -118,7 +131,7 @@ func (s *MemoryStore) GetDecisionsPaginated(page, pageSize int) PaginatedRespons
 	result := make([]TradeDecision, 0, end-start)
 	for i := total - 1 - start; i >= total-end; i-- {
 		if i >= 0 && i < total {
-			result = append(result, s.decisions[i])
+			result = append(result, filtered[i])
 		}
 	}
 
