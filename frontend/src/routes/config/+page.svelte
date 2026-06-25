@@ -11,8 +11,6 @@
 	let config = $state<SystemConfig | null>(null);
 	let loading = $state(true);
 	let error = $state<string | null>(null);
-	let showAddAgent = $state(false);
-	let newAgent = $state({ name: '', description: '', llm_model: '', enabled: true });
 
 	onMount(async () => {
 		try {
@@ -45,30 +43,6 @@
 			);
 		} catch (e) {
 			error = e instanceof Error ? e.message : '更新失败';
-		}
-	}
-
-	async function deleteAgent(id: string) {
-		try {
-			await api.deleteAgent(id);
-			agents = agents.filter((a) => a.id !== id);
-		} catch (e) {
-			error = e instanceof Error ? e.message : '删除失败';
-		}
-	}
-
-	async function addAgent() {
-		try {
-			const created = await api.createAgent({
-				agent_id: newAgent.name.toLowerCase().replace(/\s+/g, '_'),
-				market: $selectedMarket === 'ALL' ? 'CN' : $selectedMarket,
-				...newAgent
-			});
-			agents = [...agents, created];
-			showAddAgent = false;
-			newAgent = { name: '', description: '', llm_model: '', enabled: true };
-		} catch (e) {
-			error = e instanceof Error ? e.message : '创建失败';
 		}
 	}
 
@@ -146,21 +120,6 @@
 					<div class="flex items-center gap-3">
 						<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
 							<svg class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-							</svg>
-						</div>
-						<div>
-							<div class="text-sm text-text-muted">数据库状态</div>
-							<div class="font-medium text-text-primary">{status.database_status}</div>
-						</div>
-					</div>
-					<StatusIndicator status={getStatusColor(status.database_status)} label="" />
-				</div>
-
-				<div class="flex items-center justify-between rounded-lg bg-surface-elevated p-4">
-					<div class="flex items-center gap-3">
-						<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10">
-							<svg class="h-5 w-5 text-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
 							</svg>
 						</div>
@@ -211,43 +170,7 @@
 	<Card>
 		<div class="flex items-center justify-between mb-4">
 			<h2 class="text-lg font-semibold text-text-primary">交易代理</h2>
-			<Button onclick={() => showAddAgent = true}>
-				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-				</svg>
-				添加代理
-			</Button>
 		</div>
-
-		{#if showAddAgent}
-			<div class="mb-6 rounded-xl border border-accent/30 bg-accent/5 p-4">
-				<h3 class="text-sm font-medium text-text-primary mb-3">新建代理</h3>
-				<div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-					<input
-						type="text"
-						placeholder="代理名称"
-						class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-accent"
-						bind:value={newAgent.name}
-					/>
-					<input
-						type="text"
-						placeholder="LLM 模型"
-						class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-accent"
-						bind:value={newAgent.llm_model}
-					/>
-					<textarea
-						placeholder="描述"
-						class="rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder-text-muted outline-none focus:border-accent sm:col-span-2"
-						rows="2"
-						bind:value={newAgent.description}
-					></textarea>
-				</div>
-				<div class="mt-3 flex gap-2">
-					<Button size="sm" onclick={addAgent}>创建</Button>
-					<Button size="sm" variant="ghost" onclick={() => showAddAgent = false}>取消</Button>
-				</div>
-			</div>
-		{/if}
 
 		{#if loading}
 			<div class="flex justify-center py-8">
@@ -273,7 +196,7 @@
 								<div class="text-xs text-text-muted">{agent.description}</div>
 								<div class="mt-1 flex items-center gap-2">
 									<Badge variant="info">{agent.llm_model}</Badge>
-									<span class="text-xs text-text-muted">ID: {agent.agent_id}</span>
+									<span class="text-xs text-text-muted">ID: {agent.id}</span>
 								</div>
 							</div>
 						</div>
@@ -294,15 +217,6 @@
 										agent.enabled ? 'translate-x-6' : 'translate-x-1'
 									)}
 								></span>
-							</button>
-							<button
-								class="rounded-lg p-2 text-text-muted hover:text-loss hover:bg-loss/10 transition-colors"
-								onclick={() => deleteAgent(agent.id)}
-								aria-label="删除 {agent.name}"
-							>
-								<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-								</svg>
 							</button>
 						</div>
 					</div>

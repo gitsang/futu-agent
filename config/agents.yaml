@@ -1,24 +1,22 @@
 agents:
-  - id: cn-agent-01
-    market: CN
-    name: "A股交易代理"
-    description: "专注于A股市场的自动交易代理"
-    llm_model: "mimo-v2.5-pro"
-    trading_strategy: "基于技术分析的A股交易策略"
-    enabled: true
-
-  - id: hk-agent-01
-    market: HK
-    name: "港股交易代理"
-    description: "专注于港股市场的自动交易代理"
-    llm_model: "mimo-v2.5-pro"
-    trading_strategy: "基于基本面分析的港股交易策略"
-    enabled: false
-
-  - id: us-agent-01
-    market: US
-    name: "美股交易代理"
-    description: "专注于美股市场的自动交易代理"
-    llm_model: "mimo-v2.5-pro"
-    trading_strategy: "基于趋势跟踪的美股交易策略"
-    enabled: false
+    - id: cn-agent-01
+      market: CN
+      name: A股交易代理
+      description: 专注于A股市场的自动交易代理
+      llm_model: mimo-v2.5-pro
+      trading_strategy: 基于技术分析的A股交易策略
+      enabled: true
+    - id: hk-agent-01
+      market: HK
+      name: 港股交易代理
+      description: 专注于港股市场的自动交易代理
+      llm_model: mimo-v2.5-pro
+      trading_strategy: 基于基本面分析的港股交易策略
+      enabled: true
+    - id: us-agent-01
+      market: US
+      name: 美股交易代理
+      description: 专注于美股市场的自动交易代理
+      llm_model: mimo-v2.5-pro
+      trading_strategy: 基于趋势跟踪的美股交易策略
+      enabled: true

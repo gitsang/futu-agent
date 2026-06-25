@@ -231,6 +231,13 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 
 				for _, pos := range positions {
 					marketStr := marketFromCode(pos.Code)
+					unrealizedPnL := pos.UnrealizedPL
+					
+					// Calculate PnL if not provided by SDK
+					if unrealizedPnL == 0 && pos.CostPrice > 0 && pos.CurPrice > 0 {
+						unrealizedPnL = (pos.CurPrice - pos.CostPrice) * pos.Quantity
+					}
+					
 					result = append(result, Position{
 						Code:          pos.Code,
 						Market:        marketStr,
@@ -238,7 +245,7 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 						Quantity:      int(pos.Quantity),
 						AvgCost:       pos.CostPrice,
 						CurrentPrice:  pos.CurPrice,
-						UnrealizedPnL: pos.UnrealizedPL,
+						UnrealizedPnL: unrealizedPnL,
 					})
 				}
 			}
@@ -258,6 +265,13 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 
 			for _, pos := range positions {
 				marketStr := marketFromCode(pos.Code)
+				unrealizedPnL := pos.UnrealizedPL
+				
+				// Calculate PnL if not provided by SDK
+				if unrealizedPnL == 0 && pos.CostPrice > 0 && pos.CurPrice > 0 {
+					unrealizedPnL = (pos.CurPrice - pos.CostPrice) * pos.Quantity
+				}
+				
 				result = append(result, Position{
 					Code:          pos.Code,
 					Market:        marketStr,
@@ -265,7 +279,7 @@ func (c *Client) GetPositions(ctx context.Context, market string) ([]Position, e
 					Quantity:      int(pos.Quantity),
 					AvgCost:       pos.CostPrice,
 					CurrentPrice:  pos.CurPrice,
-					UnrealizedPnL: pos.UnrealizedPL,
+					UnrealizedPnL: unrealizedPnL,
 				})
 			}
 		}

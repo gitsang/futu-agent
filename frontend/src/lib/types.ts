@@ -17,7 +17,7 @@ export interface Position {
 }
 
 export interface Decision {
-	id: string;
+	id: number;
 	agent_id: string;
 	stock_code: string;
 	market: string;
@@ -48,11 +48,11 @@ export interface Order {
 
 export interface Agent {
 	id: string;
-	agent_id: string;
 	market: string;
 	name: string;
 	description: string;
 	llm_model: string;
+	trading_strategy: string;
 	enabled: boolean;
 }
 
@@ -62,7 +62,6 @@ export interface SystemConfig {
 
 export interface SystemStatus {
 	server_status: string;
-	database_status: string;
 	futu_opend_status: string;
 	trading_enabled: boolean;
 	active_agents: number;
