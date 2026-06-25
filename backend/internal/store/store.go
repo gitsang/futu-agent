@@ -26,6 +26,8 @@ type PaginatedResponse struct {
 	TotalPages int         `json:"total_pages"`
 }
 
+const maxDecisions = 10000
+
 type MemoryStore struct {
 	mu         sync.RWMutex
 	decisions  []TradeDecision
@@ -48,6 +50,12 @@ func (s *MemoryStore) SaveDecision(decision TradeDecision) TradeDecision {
 	s.nextID++
 
 	s.decisions = append(s.decisions, decision)
+	
+	// Clean up old decisions if we exceed the limit
+	if len(s.decisions) > maxDecisions {
+		s.decisions = s.decisions[len(s.decisions)-maxDecisions:]
+	}
+	
 	return decision
 }
 

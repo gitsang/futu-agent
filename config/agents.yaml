@@ -5,7 +5,7 @@ agents:
       description: 专注于A股市场的自动交易代理
       llm_model: mimo-v2.5-pro
       trading_strategy: 基于技术分析的A股交易策略
-      enabled: true
+      enabled: false
     - id: hk-agent-01
       market: HK
       name: 港股交易代理

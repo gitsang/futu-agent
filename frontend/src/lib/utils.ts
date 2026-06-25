@@ -34,7 +34,10 @@ export function cn(...classes: (string | boolean | undefined | null)[]): string 
 }
 
 export function exportToCSV(data: Record<string, unknown>[], filename: string) {
-	if (data.length === 0) return;
+	if (data.length === 0) {
+		alert('没有数据可导出');
+		return;
+	}
 
 	const headers = Object.keys(data[0]);
 	const csvContent = [
@@ -56,6 +59,10 @@ export function exportToCSV(data: Record<string, unknown>[], filename: string) {
 	const link = document.createElement('a');
 	link.href = URL.createObjectURL(blob);
 	link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
+	document.body.appendChild(link);
 	link.click();
+	document.body.removeChild(link);
 	URL.revokeObjectURL(link.href);
+	
+	alert(`导出成功！共 ${data.length} 条记录`);
 }

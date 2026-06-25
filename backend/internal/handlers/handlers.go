@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -33,6 +34,11 @@ func (h *Handler) GetAccountFunds(w http.ResponseWriter, r *http.Request) {
 	market := r.URL.Query().Get("market")
 	if market == "" {
 		market = "ALL"
+	}
+
+	if !validateMarket(market) {
+		respondError(w, http.StatusBadRequest, "Invalid market parameter")
+		return
 	}
 
 	funds, err := h.futuClient.GetAccountFunds(r.Context(), market)
@@ -199,9 +205,16 @@ func (h *Handler) countEnabledAgents() int {
 func respondJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	if err := json.NewEncoder(w).Encode(data); err != nil {
+		log.Printf("Failed to encode response: %v", err)
+	}
 }
 
 func respondError(w http.ResponseWriter, status int, message string) {
 	respondJSON(w, status, map[string]string{"error": message})
+}
+
+func validateMarket(market string) bool {
+	validMarkets := map[string]bool{"HK": true, "US": true, "CN": true, "ALL": true, "": true}
+	return validMarkets[market]
 }

@@ -14,14 +14,14 @@
 
 	onMount(async () => {
 		try {
-			const [fundsData, positionsData, decisionsData] = await Promise.all([
+			const [fundsData, positionsData, decisionsResult] = await Promise.all([
 				api.getAllFunds(),
 				api.getPositions(),
-				api.getDecisions()
+				api.getDecisions(undefined, 1, 5)
 			]);
 			allFunds = fundsData;
 			positions = positionsData;
-			decisions = decisionsData.slice(0, 5);
+			decisions = decisionsResult.data || [];
 		} catch (e) {
 			error = e instanceof Error ? e.message : '加载失败';
 		} finally {
