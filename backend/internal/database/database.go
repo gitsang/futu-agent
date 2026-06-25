@@ -91,7 +91,6 @@ func Migrate(db *sql.DB) error {
 		}
 	}
 
-	// Add market column to existing tables if not exists
 	alterMigrations := []string{
 		`DO $$ BEGIN
 			IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='account_funds' AND column_name='market') THEN
@@ -113,6 +112,20 @@ func Migrate(db *sql.DB) error {
 	for _, migration := range alterMigrations {
 		if _, err := db.Exec(migration); err != nil {
 			return fmt.Errorf("failed to execute alter migration: %w", err)
+		}
+	}
+
+	indexMigrations := []string{
+		`CREATE INDEX IF NOT EXISTS idx_trade_decisions_agent_id ON trade_decisions(agent_id)`,
+		`CREATE INDEX IF NOT EXISTS idx_trade_decisions_market ON trade_decisions(market)`,
+		`CREATE INDEX IF NOT EXISTS idx_trade_decisions_created_at ON trade_decisions(created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_trade_decisions_stock_code ON trade_decisions(stock_code)`,
+		`CREATE INDEX IF NOT EXISTS idx_trade_decisions_executed ON trade_decisions(executed)`,
+	}
+
+	for _, migration := range indexMigrations {
+		if _, err := db.Exec(migration); err != nil {
+			return fmt.Errorf("failed to execute index migration: %w", err)
 		}
 	}
 

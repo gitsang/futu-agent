@@ -31,12 +31,14 @@ const maxDecisions = 10000
 type MemoryStore struct {
 	mu         sync.RWMutex
 	decisions  []TradeDecision
+	idIndex    map[int64]int
 	nextID     int64
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
 		decisions: make([]TradeDecision, 0),
+		idIndex:   make(map[int64]int),
 		nextID:    1,
 	}
 }
@@ -50,13 +52,21 @@ func (s *MemoryStore) SaveDecision(decision TradeDecision) TradeDecision {
 	s.nextID++
 
 	s.decisions = append(s.decisions, decision)
+	s.idIndex[decision.ID] = len(s.decisions) - 1
 	
-	// Clean up old decisions if we exceed the limit
 	if len(s.decisions) > maxDecisions {
-		s.decisions = s.decisions[len(s.decisions)-maxDecisions:]
+		s.rebuildIndex()
 	}
 	
 	return decision
+}
+
+func (s *MemoryStore) rebuildIndex() {
+	s.decisions = s.decisions[len(s.decisions)-maxDecisions:]
+	s.idIndex = make(map[int64]int, len(s.decisions))
+	for i, d := range s.decisions {
+		s.idIndex[d.ID] = i
+	}
 }
 
 func (s *MemoryStore) GetDecisions(limit int) []TradeDecision {
@@ -105,7 +115,6 @@ func (s *MemoryStore) GetDecisionsPaginated(page, pageSize int) PaginatedRespons
 		end = total
 	}
 
-	// Get decisions in reverse order (newest first)
 	result := make([]TradeDecision, 0, end-start)
 	for i := total - 1 - start; i >= total-end; i-- {
 		if i >= 0 && i < total {
@@ -126,23 +135,31 @@ func (s *MemoryStore) GetDecision(id int64) *TradeDecision {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	for i := range s.decisions {
-		if s.decisions[i].ID == id {
-			return &s.decisions[i]
-		}
+	idx, exists := s.idIndex[id]
+	if !exists {
+		return nil
 	}
-	return nil
+
+	if idx < 0 || idx >= len(s.decisions) {
+		return nil
+	}
+
+	return &s.decisions[idx]
 }
 
 func (s *MemoryStore) MarkExecuted(id int64) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	for i := range s.decisions {
-		if s.decisions[i].ID == id {
-			s.decisions[i].Executed = true
-			return true
-		}
+	idx, exists := s.idIndex[id]
+	if !exists {
+		return false
 	}
-	return false
+
+	if idx < 0 || idx >= len(s.decisions) {
+		return false
+	}
+
+	s.decisions[idx].Executed = true
+	return true
 }
