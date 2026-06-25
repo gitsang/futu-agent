@@ -4,19 +4,75 @@ agents:
       name: A股交易代理
       description: 专注于A股市场的自动交易代理
       llm_model: mimo-v2.5-pro
-      trading_strategy: 基于技术分析的A股交易策略
       enabled: true
+      trading_strategy: |
+        基于技术分析的A股交易策略：
+        1. 关注大盘走势（上证指数、深证成指）
+        2. 重点分析茅台、平安等蓝筹股
+        3. 使用MACD、KDJ、RSI等技术指标
+        4. 关注成交量变化，放量突破时买入
+        5. A股涨跌幅限制10%，注意止损
+        6. 支撑位买入，阻力位卖出
+      rules:
+        aggression_level: aggressive
+        buy_on_dip_threshold: 1.0
+        take_profit_threshold: 3.0
+        stop_loss_threshold: 5.0
+        cash_usage_min: 30
+        cash_usage_max: 50
+        max_cash_ratio: 70
+        position_loss_threshold: 3.0
+        lot_size: 100
+        lot_size_rule: "A股数量必须是100的整数倍"
+        
     - id: hk-agent-01
       market: HK
       name: 港股交易代理
       description: 专注于港股市场的自动交易代理
       llm_model: mimo-v2.5-pro
-      trading_strategy: 基于基本面分析的港股交易策略
       enabled: true
+      trading_strategy: |
+        基于基本面分析的港股交易策略：
+        1. 关注恒生指数走势
+        2. 重点分析腾讯、小米、美团等科技股
+        3. 关注港股通资金流向
+        4. 分析公司财报和估值（PE、PB）
+        5. 港股无涨跌幅限制，严格止损
+        6. 关注美股走势对港股的影响
+      rules:
+        aggression_level: moderate
+        buy_on_dip_threshold: 2.0
+        take_profit_threshold: 5.0
+        stop_loss_threshold: 8.0
+        cash_usage_min: 20
+        cash_usage_max: 40
+        max_cash_ratio: 60
+        position_loss_threshold: 5.0
+        lot_size: 0
+        lot_size_rule: "港股数量取决于股票的每手股数（通常为100、200、400、500、1000、2000）"
+        
     - id: us-agent-01
       market: US
       name: 美股交易代理
       description: 专注于美股市场的自动交易代理
       llm_model: mimo-v2.5-pro
-      trading_strategy: 基于趋势跟踪的美股交易策略
       enabled: true
+      trading_strategy: |
+        基于趋势跟踪的美股交易策略：
+        1. 关注纳斯达克、标普500指数
+        2. 重点分析科技股（苹果、微软、特斯拉）
+        3. 使用移动平均线（MA20、MA60）判断趋势
+        4. 关注美联储政策和经济数据
+        5. 美股允许盘前盘后交易
+        6. 设置止损单控制风险
+      rules:
+        aggression_level: aggressive
+        buy_on_dip_threshold: 1.5
+        take_profit_threshold: 4.0
+        stop_loss_threshold: 6.0
+        cash_usage_min: 30
+        cash_usage_max: 50
+        max_cash_ratio: 70
+        position_loss_threshold: 4.0
+        lot_size: 1
+        lot_size_rule: "美股数量可以是任意正整数（不支持碎股）"

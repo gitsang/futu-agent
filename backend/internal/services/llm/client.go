@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/gitsang/futu-agent/backend/internal/config"
 )
 
 type Client struct {
@@ -113,51 +115,69 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message) (string
 	return chatResp.Choices[0].Message.Content, nil
 }
 
-func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo string) (*TradeDecision, error) {
-	systemPrompt := `You are an aggressive AI trading agent for simulated trading. Your goal is to maximize returns through active trading.
+func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo, tradingStrategy string, rules config.AgentRules) (*TradeDecision, error) {
+	aggressionDesc := "保守"
+	if rules.AggressionLevel == "aggressive" {
+		aggressionDesc = "激进"
+	} else if rules.AggressionLevel == "moderate" {
+		aggressionDesc = "适中"
+	}
 
-Output a JSON object with the following structure:
+	systemPrompt := fmt.Sprintf(`你是一个%s的AI交易代理，用于模拟交易。你的目标是通过积极交易最大化收益。
+
+输出以下JSON格式的决策：
 {
   "action": "BUY" | "SELL" | "HOLD",
-  "code": "stock code",
+  "code": "股票代码",
   "market": "HK" | "US" | "CN",
-  "quantity": number,
-  "price": number,
-  "reason": "explanation for the decision"
+  "quantity": 数量,
+  "price": 价格,
+  "reason": "决策原因"
 }
 
-Trading Strategy:
-1. Be AGGRESSIVE - this is simulated trading, take risks!
-2. Look for opportunities to buy on dips (when price drops > 1%)
-3. Take profits when gains exceed 3%
-4. Cut losses when losses exceed 5%
-5. Use 30-50% of available cash per trade
-6. Trade frequently - don't just hold!
-7. Use technical indicators: volume spikes, price momentum, support/resistance
-8. If you have > 70% cash, you MUST find something to buy
-9. If a position is down > 3%, consider averaging down or cutting loss
-
-IMPORTANT LOT SIZE RULES:
-- CN (A-shares): quantity MUST be a multiple of 100 (e.g., 100, 200, 300, 1000)
-- HK (港股): quantity depends on stock's lot size (usually 100, 200, 400, 500, 1000, 2000)
-- US (美股): quantity can be any positive integer (fractional shares not supported)
-
-Rules:
-1. Only output valid JSON, no other text
-2. Never output HOLD if cash > 70% of total assets - find something to buy!
-3. Be decisive - make a trade decision every cycle
-4. For simulation, err on the side of action, not inaction`
-
-	userPrompt := fmt.Sprintf(`Current Market Data:
+交易策略：
 %s
 
-Current Positions:
+通用规则：
+1. 跌幅超过%.1f%%时寻找抄底机会
+2. 涨幅超过%.1f%%时考虑止盈
+3. 亏损超过%.1f%%时考虑止损
+4. 每次交易使用%d-%d%%的可用资金
+5. 频繁交易，不要只是持有！
+6. 使用技术指标：成交量、价格动量、支撑阻力位
+7. 如果现金超过总资产的%d%%，必须找到买入机会
+8. 如果持仓亏损超过%.1f%%，考虑加仓或止损
+
+手数规则（必须遵守）：
+- %s
+
+规则：
+1. 只输出有效的JSON，不要输出其他文本
+2. 如果现金超过总资产的%d%%，绝不能输出HOLD - 必须找到买入机会！
+3. 果断决策 - 每个交易周期都要做出决策
+4. 模拟交易时，偏向行动而非不行动`,
+		aggressionDesc,
+		tradingStrategy,
+		rules.BuyOnDipThreshold,
+		rules.TakeProfitThreshold,
+		rules.StopLossThreshold,
+		rules.CashUsageMin,
+		rules.CashUsageMax,
+		rules.MaxCashRatio,
+		rules.PositionLossThreshold,
+		rules.LotSizeRule,
+		rules.MaxCashRatio)
+
+	userPrompt := fmt.Sprintf(`当前市场数据：
 %s
 
-Account Information:
+当前持仓：
 %s
 
-Analyze and provide a trading decision in JSON format. Remember: be aggressive, trade actively!`, marketData, positions, accountInfo)
+账户信息：
+%s
+
+请分析并提供JSON格式的交易决策。记住：要%s，积极交易！`, marketData, positions, accountInfo, aggressionDesc)
 
 	messages := []Message{
 		{Role: "system", Content: systemPrompt},

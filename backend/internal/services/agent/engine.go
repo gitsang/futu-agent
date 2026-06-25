@@ -182,7 +182,12 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 	positionsJSON, _ := json.Marshal(positions)
 	accountJSON, _ := json.Marshal(accountFunds)
 
-	decision, err := e.llmClient.AnalyzeAndDecide(ctx, marketData, string(positionsJSON), string(accountJSON))
+	tradingStrategy := worker.Config.TradingStrategy
+	if tradingStrategy == "" {
+		tradingStrategy = "基于技术分析的通用交易策略"
+	}
+
+	decision, err := e.llmClient.AnalyzeAndDecide(ctx, marketData, string(positionsJSON), string(accountJSON), tradingStrategy, worker.Config.Rules)
 	if err != nil {
 		log.Printf("Agent %s failed to analyze: %v", worker.AgentID, err)
 		return

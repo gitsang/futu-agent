@@ -10,14 +10,28 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+type AgentRules struct {
+	AggressionLevel       string  `yaml:"aggression_level" json:"aggression_level"`
+	BuyOnDipThreshold     float64 `yaml:"buy_on_dip_threshold" json:"buy_on_dip_threshold"`
+	TakeProfitThreshold   float64 `yaml:"take_profit_threshold" json:"take_profit_threshold"`
+	StopLossThreshold     float64 `yaml:"stop_loss_threshold" json:"stop_loss_threshold"`
+	CashUsageMin          int     `yaml:"cash_usage_min" json:"cash_usage_min"`
+	CashUsageMax          int     `yaml:"cash_usage_max" json:"cash_usage_max"`
+	MaxCashRatio          int     `yaml:"max_cash_ratio" json:"max_cash_ratio"`
+	PositionLossThreshold float64 `yaml:"position_loss_threshold" json:"position_loss_threshold"`
+	LotSize               int     `yaml:"lot_size" json:"lot_size"`
+	LotSizeRule           string  `yaml:"lot_size_rule" json:"lot_size_rule"`
+}
+
 type AgentConfig struct {
-	ID              string `yaml:"id" json:"id"`
-	Market          string `yaml:"market" json:"market"`
-	Name            string `yaml:"name" json:"name"`
-	Description     string `yaml:"description" json:"description"`
-	LLMModel        string `yaml:"llm_model" json:"llm_model"`
-	TradingStrategy string `yaml:"trading_strategy" json:"trading_strategy"`
-	Enabled         bool   `yaml:"enabled" json:"enabled"`
+	ID              string      `yaml:"id" json:"id"`
+	Market          string      `yaml:"market" json:"market"`
+	Name            string      `yaml:"name" json:"name"`
+	Description     string      `yaml:"description" json:"description"`
+	LLMModel        string      `yaml:"llm_model" json:"llm_model"`
+	TradingStrategy string      `yaml:"trading_strategy" json:"trading_strategy"`
+	Enabled         bool        `yaml:"enabled" json:"enabled"`
+	Rules           AgentRules  `yaml:"rules" json:"rules"`
 }
 
 type AgentsConfig struct {
