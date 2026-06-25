@@ -222,6 +222,24 @@ func (h *Handler) GetMarketOverview(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, overview)
 }
 
+func (h *Handler) GetTradeHistory(w http.ResponseWriter, r *http.Request) {
+	market := r.URL.Query().Get("market")
+	daysStr := r.URL.Query().Get("days")
+
+	days := 30
+	if d, err := strconv.Atoi(daysStr); err == nil && d > 0 {
+		days = d
+	}
+
+	history, err := h.futuClient.GetTradeHistory(r.Context(), market, days)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "Failed to fetch trade history")
+		return
+	}
+
+	respondJSON(w, http.StatusOK, history)
+}
+
 func (h *Handler) countEnabledAgents() int {
 	count := 0
 	for _, agent := range h.cfg.Agents {

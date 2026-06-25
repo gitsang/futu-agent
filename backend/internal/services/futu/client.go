@@ -448,6 +448,60 @@ func (c *Client) GetOrders(ctx context.Context, market string) ([]Order, error) 
 	return result, nil
 }
 
+type StockScreener struct {
+	Code        string  `json:"code"`
+	Market      string  `json:"market"`
+	Name        string  `json:"name"`
+	Price       float64 `json:"price"`
+	ChangePct   float64 `json:"change_pct"`
+	Volume      int64   `json:"volume"`
+	Turnover    float64 `json:"turnover"`
+	MarketValue float64 `json:"market_value"`
+	PE          float64 `json:"pe"`
+	PB          float64 `json:"pb"`
+}
+
+func (c *Client) ScreenStocks(ctx context.Context, market string, minPrice, maxPrice float64, minVolume int64) ([]StockScreener, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	marketConst, ok := marketMap[market]
+	if !ok {
+		return nil, fmt.Errorf("unsupported market: %s", market)
+	}
+
+	_ = marketConst
+	result := make([]StockScreener, 0)
+	return result, nil
+}
+
+func (c *Client) GetTradeHistory(ctx context.Context, market string, days int) ([]Order, error) {
+	if !c.IsConnected() {
+		return nil, fmt.Errorf("not connected to Futu OpenD")
+	}
+
+	orders, err := c.GetOrders(ctx, market)
+	if err != nil {
+		return nil, err
+	}
+
+	cutoff := time.Now().AddDate(0, 0, -days)
+	result := make([]Order, 0, len(orders))
+
+	for _, order := range orders {
+		orderTime, err := time.Parse("2006-01-02 15:04:05", order.CreateTime)
+		if err != nil {
+			continue
+		}
+		if orderTime.After(cutoff) {
+			result = append(result, order)
+		}
+	}
+
+	return result, nil
+}
+
 func convertOrder(o client.Order) Order {
 	// TrdSide: 0=Unknown, 1=Buy, 2=Sell, 3=SellShort, 4=BuyBack
 	side := "BUY"

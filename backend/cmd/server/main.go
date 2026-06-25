@@ -92,6 +92,7 @@ func main() {
 		r.Get("/status", handler.GetStatus)
 		r.Get("/stats/trading", handler.GetTradingStats)
 		r.Get("/stats/market", handler.GetMarketOverview)
+		r.Get("/stats/history", handler.GetTradeHistory)
 	})
 
 	ctx, cancel := context.WithCancel(context.Background())
