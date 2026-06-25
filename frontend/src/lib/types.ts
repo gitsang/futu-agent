@@ -66,3 +66,11 @@ export interface SystemStatus {
 	trading_enabled: boolean;
 	active_agents: number;
 }
+
+export interface PaginatedResponse {
+	data: Decision[];
+	page: number;
+	page_size: number;
+	total: number;
+	total_pages: number;
+}

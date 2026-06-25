@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
-	import type { Decision } from '$lib/types';
+	import type { Decision, PaginatedResponse } from '$lib/types';
 	import { formatDate, cn } from '$lib/utils';
 	import { Card, Badge, LoadingSpinner, Button } from '$lib/components';
 	import { selectedMarket } from '$lib/stores';
@@ -11,22 +11,39 @@
 	let error = $state<string | null>(null);
 	let selectedDecision = $state<Decision | null>(null);
 	let filter = $state<'all' | 'buy' | 'sell' | 'hold'>('all');
+	let currentPage = $state(1);
+	let totalPages = $state(1);
+	let totalItems = $state(0);
+	const pageSize = 20;
 
-	onMount(async () => {
+	async function loadDecisions(page: number = 1) {
+		loading = true;
 		try {
-			decisions = await api.getDecisions();
+			const result = await api.getDecisions($selectedMarket === 'ALL' ? undefined : $selectedMarket, page, pageSize);
+			decisions = result.data || [];
+			currentPage = result.page;
+			totalPages = result.total_pages;
+			totalItems = result.total;
 		} catch (e) {
 			error = e instanceof Error ? e.message : '加载失败';
 		} finally {
 			loading = false;
 		}
-	});
+	}
+
+	onMount(() => loadDecisions());
 
 	let filteredDecisions = $derived(
-		decisions
-			.filter(d => $selectedMarket === 'ALL' || d.market === $selectedMarket)
-			.filter(d => filter === 'all' || d.action?.toLowerCase() === filter)
+		filter === 'all'
+			? decisions
+			: decisions.filter(d => d.action?.toLowerCase() === filter)
 	);
+
+	function goToPage(page: number) {
+		if (page >= 1 && page <= totalPages) {
+			loadDecisions(page);
+		}
+	}
 
 	function getActionVariant(action: string) {
 		switch (action?.toLowerCase()) {
@@ -126,6 +143,32 @@
 						</div>
 					</button>
 				{/each}
+
+				{#if totalPages > 1}
+					<div class="flex items-center justify-between pt-4">
+						<div class="text-sm text-text-muted">
+							共 {totalItems} 条记录，第 {currentPage}/{totalPages} 页
+						</div>
+						<div class="flex gap-2">
+							<Button
+								variant="secondary"
+								size="sm"
+								disabled={currentPage <= 1}
+								onclick={() => goToPage(currentPage - 1)}
+							>
+								上一页
+							</Button>
+							<Button
+								variant="secondary"
+								size="sm"
+								disabled={currentPage >= totalPages}
+								onclick={() => goToPage(currentPage + 1)}
+							>
+								下一页
+							</Button>
+						</div>
+					</div>
+				{/if}
 			{/if}
 		</div>
 

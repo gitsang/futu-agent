@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import type { Position } from '$lib/types';
-	import { formatCurrency, formatNumber, cn } from '$lib/utils';
+	import { formatCurrency, formatNumber, cn, exportToCSV } from '$lib/utils';
 	import { Card, StatCard, Badge, LoadingSpinner, Button } from '$lib/components';
 	import { selectedMarket } from '$lib/stores';
 
@@ -21,6 +21,20 @@
 			loading = false;
 		}
 	});
+
+	function handleExport() {
+		const exportData = sortedPositions.map(p => ({
+			'股票代码': p.code,
+			'股票名称': p.name,
+			'市场': p.market,
+			'持仓数量': p.quantity,
+			'成本价': p.avg_cost.toFixed(2),
+			'现价': p.current_price.toFixed(2),
+			'持仓盈亏': ((p.current_price - p.avg_cost) * p.quantity).toFixed(2),
+			'盈亏率': (((p.current_price - p.avg_cost) / p.avg_cost) * 100).toFixed(2) + '%'
+		}));
+		exportToCSV(exportData, '持仓数据');
+	}
 
 	let filteredPositions = $derived(
 		$selectedMarket === 'ALL'
@@ -79,12 +93,20 @@
 			<h1 class="text-2xl font-semibold text-text-primary">持仓管理</h1>
 			<p class="text-sm text-text-secondary">当前股票持仓与盈亏分析</p>
 		</div>
-		<Button variant="secondary" onclick={() => window.location.reload()}>
-			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-			</svg>
-			刷新
-		</Button>
+		<div class="flex gap-2">
+			<Button variant="secondary" onclick={handleExport}>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+				</svg>
+				导出
+			</Button>
+			<Button variant="secondary" onclick={() => window.location.reload()}>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+				</svg>
+				刷新
+			</Button>
+		</div>
 	</div>
 
 	{#if error}

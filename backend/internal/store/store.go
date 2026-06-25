@@ -18,6 +18,14 @@ type TradeDecision struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type PaginatedResponse struct {
+	Data       interface{} `json:"data"`
+	Page       int         `json:"page"`
+	PageSize   int         `json:"page_size"`
+	Total      int         `json:"total"`
+	TotalPages int         `json:"total_pages"`
+}
+
 type MemoryStore struct {
 	mu         sync.RWMutex
 	decisions  []TradeDecision
@@ -64,6 +72,46 @@ func (s *MemoryStore) GetDecisions(limit int) []TradeDecision {
 	}
 
 	return result
+}
+
+func (s *MemoryStore) GetDecisionsPaginated(page, pageSize int) PaginatedResponse {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	total := len(s.decisions)
+	totalPages := (total + pageSize - 1) / pageSize
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	if page < 1 {
+		page = 1
+	}
+	if page > totalPages {
+		page = totalPages
+	}
+
+	start := (page - 1) * pageSize
+	end := start + pageSize
+	if end > total {
+		end = total
+	}
+
+	// Get decisions in reverse order (newest first)
+	result := make([]TradeDecision, 0, end-start)
+	for i := total - 1 - start; i >= total-end; i-- {
+		if i >= 0 && i < total {
+			result = append(result, s.decisions[i])
+		}
+	}
+
+	return PaginatedResponse{
+		Data:       result,
+		Page:       page,
+		PageSize:   pageSize,
+		Total:      total,
+		TotalPages: totalPages,
+	}
 }
 
 func (s *MemoryStore) GetDecision(id int64) *TradeDecision {

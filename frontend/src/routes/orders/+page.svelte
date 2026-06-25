@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '$lib/api';
 	import type { Order } from '$lib/types';
-	import { cn } from '$lib/utils';
+	import { cn, exportToCSV } from '$lib/utils';
 	import { Card, Badge, LoadingSpinner, Button } from '$lib/components';
 	import { selectedMarket } from '$lib/stores';
 
@@ -19,6 +19,23 @@
 			loading = false;
 		}
 	});
+
+	function handleExport() {
+		const exportData = filteredOrders.map(o => ({
+			'订单号': o.order_id,
+			'股票代码': o.code,
+			'股票名称': o.name,
+			'市场': o.market,
+			'方向': o.side === 'BUY' ? '买入' : '卖出',
+			'委托价': o.price.toFixed(2),
+			'委托量': o.qty,
+			'成交量': o.fill_qty,
+			'成交价': o.fill_price.toFixed(2),
+			'状态': getStatusLabel(o.status),
+			'下单时间': o.create_time
+		}));
+		exportToCSV(exportData, '订单数据');
+	}
 
 	let filteredOrders = $derived(
 		$selectedMarket === 'ALL'
@@ -84,12 +101,20 @@
 			<h1 class="text-2xl font-semibold text-text-primary">订单管理</h1>
 			<p class="text-sm text-text-secondary">查看所有交易订单状态</p>
 		</div>
-		<Button variant="secondary" onclick={() => window.location.reload()}>
-			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-			</svg>
-			刷新
-		</Button>
+		<div class="flex gap-2">
+			<Button variant="secondary" onclick={handleExport}>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+				</svg>
+				导出
+			</Button>
+			<Button variant="secondary" onclick={() => window.location.reload()}>
+				<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+				</svg>
+				刷新
+			</Button>
+		</div>
 	</div>
 
 	{#if error}

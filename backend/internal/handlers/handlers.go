@@ -87,18 +87,30 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetDecisions(w http.ResponseWriter, r *http.Request) {
+	// Pagination parameters
+	pageStr := r.URL.Query().Get("page")
+	pageSizeStr := r.URL.Query().Get("page_size")
+
+	page := 1
+	pageSize := 20
+
+	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+		page = p
+	}
+	if ps, err := strconv.Atoi(pageSizeStr); err == nil && ps > 0 && ps <= 100 {
+		pageSize = ps
+	}
+
+	// Legacy limit parameter support
 	limitStr := r.URL.Query().Get("limit")
-	limit := 50
 	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
-		limit = l
+		// If limit is provided, use it as pageSize for backward compatibility
+		pageSize = l
+		page = 1
 	}
 
-	decisions := h.store.GetDecisions(limit)
-	if decisions == nil {
-		decisions = []store.TradeDecision{}
-	}
-
-	respondJSON(w, http.StatusOK, decisions)
+	result := h.store.GetDecisionsPaginated(page, pageSize)
+	respondJSON(w, http.StatusOK, result)
 }
 
 func (h *Handler) GetDecision(w http.ResponseWriter, r *http.Request) {

@@ -1,5 +1,5 @@
 import { browser } from '$app/environment';
-import type { AccountFunds, Agent, Decision, Order, Position, SystemConfig, SystemStatus } from './types';
+import type { AccountFunds, Agent, Decision, Order, PaginatedResponse, Position, SystemConfig, SystemStatus } from './types';
 
 const BASE_URL = browser ? '' : 'http://localhost:8080';
 
@@ -26,7 +26,14 @@ export const api = {
 	getPositions: (market?: string) => fetchApi<Position[]>(`/account/positions${market ? `?market=${market}` : ''}`),
 	getOrders: (market?: string) => fetchApi<Order[]>(`/account/orders${market ? `?market=${market}` : ''}`),
 
-	getDecisions: (market?: string) => fetchApi<Decision[]>(`/decisions${market ? `?market=${market}` : ''}`),
+	getDecisions: (market?: string, page?: number, pageSize?: number) => {
+		const params = new URLSearchParams();
+		if (market && market !== 'ALL') params.set('market', market);
+		if (page) params.set('page', page.toString());
+		if (pageSize) params.set('page_size', pageSize.toString());
+		const query = params.toString();
+		return fetchApi<PaginatedResponse>(`/decisions${query ? `?${query}` : ''}`);
+	},
 	getDecision: (id: string) => fetchApi<Decision>(`/decisions/${id}`),
 
 	getAgents: () => fetchApi<Agent[]>('/agents'),
