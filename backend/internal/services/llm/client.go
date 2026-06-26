@@ -115,7 +115,7 @@ func (c *Client) ChatCompletion(ctx context.Context, messages []Message) (string
 	return chatResp.Choices[0].Message.Content, nil
 }
 
-func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo, candidates, tradingStrategy string, rules config.AgentRules) (*TradeDecision, error) {
+func (c *Client) AnalyzeAndDecide(ctx context.Context, marketData, positions, accountInfo, candidates, tradingStrategy string, rules config.RuleTemplate) (*TradeDecision, error) {
 	var aggressionDesc, goalDesc, actionBias string
 	switch rules.AggressionLevel {
 	case "aggressive":

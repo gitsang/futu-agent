@@ -12,7 +12,9 @@ import (
 	"github.com/shing1211/futuapi4go/pkg/constant"
 	futuapi "github.com/shing1211/futuapi4go/pkg/futuapi"
 	"github.com/shing1211/futuapi4go/pkg/pb/qotstockfilter"
+	"github.com/shing1211/futuapi4go/pkg/qot"
 	"github.com/shing1211/futuapi4go/pkg/trd"
+	"google.golang.org/protobuf/proto"
 )
 
 var marketMap = map[string]constant.TrdMarket{
@@ -518,7 +520,11 @@ func (c *Client) ScreenStocks(ctx context.Context, market string, minPrice, maxP
 		return nil, fmt.Errorf("unsupported market: %s", market)
 	}
 
-	log.Printf("ScreenStocks: market=%s, minPrice=%.2f, maxPrice=%.2f, minVolume=%d, markets=%v", market, minPrice, maxPrice, minVolume, markets)
+		log.Printf("ScreenStocks: market=%s, minPrice=%.2f, maxPrice=%.2f, minVolume=%d, markets=%v", market, minPrice, maxPrice, minVolume, markets)
+	log.Printf("ScreenStocks: sdkClient=%v, inner=%v", c.sdkClient != nil, c.sdkClient.Inner() != nil)
+
+	baseFilterList := buildBaseFilterList()
+	log.Printf("ScreenStocks: baseFilterList count=%d", len(baseFilterList))
 
 	const pageSize int32 = 100
 	result := make([]StockScreener, 0, pageSize)
@@ -526,14 +532,28 @@ func (c *Client) ScreenStocks(ctx context.Context, market string, minPrice, maxP
 		totalFetched := 0
 		totalFiltered := 0
 		for begin := int32(0); ; begin += pageSize {
-			stocks, err := client.StockFilter(ctx, c.sdkClient, marketConst, begin, pageSize)
+			req := &qot.StockFilterRequest{
+				Market:         int32(marketConst),
+				Begin:          begin,
+				Num:            pageSize,
+				BaseFilterList: baseFilterList,
+				AccumulateFilterList: []*qotstockfilter.AccumulateFilter{
+					{FieldName: proto.Int32(int32(qotstockfilter.AccumulateField_AccumulateField_Volume)), Days: proto.Int32(1), IsNoFilter: proto.Bool(true)},
+					{FieldName: proto.Int32(int32(qotstockfilter.AccumulateField_AccumulateField_Turnover)), Days: proto.Int32(1), IsNoFilter: proto.Bool(true)},
+				},
+			}
+
+			resp, err := qot.StockFilter(ctx, c.sdkClient.Inner(), req)
 			if err != nil {
 				return nil, fmt.Errorf("StockFilter failed for %s: %w", market, err)
 			}
 
-			totalFetched += len(stocks)
-			for _, stock := range stocks {
-				candidate := stockFilterResultToCandidate(stock)
+			totalFetched += len(resp.DataList)
+			for _, data := range resp.DataList {
+				if data == nil {
+					continue
+				}
+				candidate := stockFilterDataToCandidate(data)
 				if !candidateMatches(candidate, minPrice, maxPrice, minVolume) {
 					continue
 				}
@@ -541,9 +561,9 @@ func (c *Client) ScreenStocks(ctx context.Context, market string, minPrice, maxP
 				result = append(result, candidateToScreener(candidate))
 			}
 
-			log.Printf("ScreenStocks: marketConst=%d, begin=%d, fetched=%d, filtered=%d, total_result=%d", marketConst, begin, len(stocks), totalFiltered, len(result))
+			log.Printf("ScreenStocks: marketConst=%d, begin=%d, fetched=%d, filtered=%d, total_result=%d", marketConst, begin, len(resp.DataList), totalFiltered, len(result))
 
-			if len(stocks) < int(pageSize) {
+			if !resp.LastPage {
 				break
 			}
 		}
@@ -552,6 +572,59 @@ func (c *Client) ScreenStocks(ctx context.Context, market string, minPrice, maxP
 
 	log.Printf("ScreenStocks: final result count=%d", len(result))
 	return result, nil
+}
+
+func buildBaseFilterList() []*qotstockfilter.BaseFilter {
+	return []*qotstockfilter.BaseFilter{
+		{FieldName: proto.Int32(int32(qotstockfilter.StockField_StockField_CurPrice)), IsNoFilter: proto.Bool(true)},
+		{FieldName: proto.Int32(int32(qotstockfilter.StockField_StockField_MarketVal)), IsNoFilter: proto.Bool(true)},
+		{FieldName: proto.Int32(int32(qotstockfilter.StockField_StockField_PeTTM)), IsNoFilter: proto.Bool(true)},
+		{FieldName: proto.Int32(int32(qotstockfilter.StockField_StockField_PbRate)), IsNoFilter: proto.Bool(true)},
+	}
+}
+
+func stockFilterDataToCandidate(data *qot.StockFilterData) StockCandidate {
+	candidate := StockCandidate{}
+
+	if data.Security != nil {
+		candidate.Code = data.Security.GetCode()
+		candidate.Market = marketFromFutuMarket(data.Security.GetMarket())
+	}
+	candidate.Name = data.Name
+
+	for _, base := range data.BaseDataList {
+		if base == nil {
+			continue
+		}
+		value := base.GetValue()
+		switch qotstockfilter.StockField(base.GetFieldName()) {
+		case qotstockfilter.StockField_StockField_CurPrice:
+			candidate.Price = value
+		case qotstockfilter.StockField_StockField_MarketVal:
+			candidate.MarketCap = value
+		case qotstockfilter.StockField_StockField_PeAnnual, qotstockfilter.StockField_StockField_PeTTM:
+			candidate.PE = value
+		case qotstockfilter.StockField_StockField_PbRate:
+			candidate.PB = value
+		}
+	}
+
+	for _, acc := range data.AccumulateDataList {
+		if acc == nil {
+			continue
+		}
+		value := acc.GetValue()
+		switch qotstockfilter.AccumulateField(acc.GetFieldName()) {
+		case qotstockfilter.AccumulateField_AccumulateField_ChangeRate:
+			candidate.ChangePct = value
+		case qotstockfilter.AccumulateField_AccumulateField_Volume:
+			candidate.Volume = int64(value)
+		case qotstockfilter.AccumulateField_AccumulateField_Turnover:
+			candidate.Turnover = value
+		}
+	}
+
+	return candidate
 }
 
 func screenMarkets(market string) ([]constant.Market, bool) {

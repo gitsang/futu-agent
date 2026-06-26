@@ -12,6 +12,7 @@ import (
 	"github.com/gitsang/futu-agent/backend/internal/config"
 	"github.com/gitsang/futu-agent/backend/internal/services/futu"
 	"github.com/gitsang/futu-agent/backend/internal/services/llm"
+	"github.com/gitsang/futu-agent/backend/internal/services/universe"
 	"github.com/gitsang/futu-agent/backend/internal/store"
 )
 
@@ -20,6 +21,7 @@ type Engine struct {
 	futuClient     *futu.CachedClient
 	llmClient      *llm.Client
 	config         *config.Config
+	universeService *universe.Service
 	agents         map[string]*AgentWorker
 	mu             sync.RWMutex
 	ctx            context.Context
@@ -31,19 +33,20 @@ type Engine struct {
 
 type AgentWorker struct {
 	AgentID string
-	Config  config.AgentConfig
+	Config  config.ResolvedAgentConfig
 	ctx     context.Context
 	cancel  context.CancelFunc
 	running bool
 	mu      sync.Mutex
 }
 
-func NewEngine(store *store.MemoryStore, futuClient *futu.CachedClient, llmClient *llm.Client, cfg *config.Config) *Engine {
+func NewEngine(store *store.MemoryStore, futuClient *futu.CachedClient, llmClient *llm.Client, cfg *config.Config, universeService *universe.Service) *Engine {
 	return &Engine{
 		store:          store,
 		futuClient:     futuClient,
 		llmClient:      llmClient,
 		config:         cfg,
+		universeService: universeService,
 		agents:         make(map[string]*AgentWorker),
 		tradingEnabled: cfg.TradingEnabled,
 		recentOrders:   make(map[string]time.Time),
@@ -78,7 +81,7 @@ func (e *Engine) loadAgents() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 
-	for _, agentCfg := range e.config.Agents {
+	for _, agentCfg := range e.config.GetResolvedAgents() {
 		if agentCfg.Enabled {
 			worker := &AgentWorker{
 				AgentID: agentCfg.ID,
@@ -208,32 +211,14 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 	stockUniverse := worker.Config.StockUniverse
 	candidates := []futu.StockScreener{}
 	if stockUniverse.Source == "screen" {
-		screenMarket := stockUniverse.ScreenConfig.Market
-		if screenMarket == "" {
-			screenMarket = market
+		if e.universeService != nil {
+			candidates = e.universeService.GetCandidates(stockUniverse.ID)
 		}
-
-		minPrice, maxPrice, minVolume := screenFilters(stockUniverse.ScreenConfig.Filters)
-		
-		// 添加重试逻辑，应对频率限制
-		maxRetries := 3
-		for retry := 0; retry < maxRetries; retry++ {
-			candidates, err = e.futuClient.ScreenStocks(ctx, screenMarket, minPrice, maxPrice, minVolume)
-			if err == nil {
-				break
-			}
-			log.Printf("选股失败 (重试 %d/%d): %v", retry+1, maxRetries, err)
-			if retry < maxRetries-1 {
-				time.Sleep(time.Duration(retry+1) * 10 * time.Second)
-			}
-		}
-		
-		if err != nil {
-			log.Printf("选股最终失败，使用默认股票池: %v", err)
-			// 使用默认股票池作为降级策略
+		if len(candidates) == 0 {
+			log.Printf("股票池 %s 无候选股票，使用默认股票池", stockUniverse.ID)
 			candidates = e.getDefaultCandidates(market)
 		}
-		
+
 		if stockUniverse.ScreenConfig.Limit > 0 && len(candidates) > stockUniverse.ScreenConfig.Limit {
 			candidates = candidates[:stockUniverse.ScreenConfig.Limit]
 		}
@@ -259,12 +244,12 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 			if pos.AvgCost > 0 {
 				pnlPct = (pos.CurrentPrice - pos.AvgCost) / pos.AvgCost * 100
 			}
-			marketDataLines = append(marketDataLines, fmt.Sprintf("- %s (%s): 持有%d股, 成本价%.2f, 现价%.2f, 盈亏%.2f%%", 
+			marketDataLines = append(marketDataLines, fmt.Sprintf("- %s (%s): 持有%d股, 成本价%.2f, 现价%.2f, 盈亏%.2f%%",
 				pos.Name, pos.Code, pos.Quantity, pos.AvgCost, pos.CurrentPrice, pnlPct))
 
 			quote, err := e.futuClient.GetQuote(ctx, market, pos.Code)
 			if err == nil {
-				marketDataLines = append(marketDataLines, fmt.Sprintf("  行情: 今开%.2f 最高%.2f 最低%.2f 昨收%.2f 涨跌幅%.2f%% 振幅%.2f%% 换手率%.2f%% 成交量%d 成交额%.2f", 
+				marketDataLines = append(marketDataLines, fmt.Sprintf("  行情: 今开%.2f 最高%.2f 最低%.2f 昨收%.2f 涨跌幅%.2f%% 振幅%.2f%% 换手率%.2f%% 成交量%d 成交额%.2f",
 					quote.Open, quote.High, quote.Low, quote.LastClose, quote.ChangePct, quote.Amplitude, quote.TurnoverRate, quote.Volume, quote.Turnover))
 			}
 		}
@@ -336,29 +321,6 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 		Executed:  true,
 	})
 }
-
-func screenFilters(filters []config.StockUniverseFilterConfig) (float64, float64, int64) {
-	var minPrice, maxPrice float64
-	var minVolume int64
-	for _, filter := range filters {
-		switch filter.Field {
-		case "price":
-			switch filter.Operator {
-			case ">", ">=":
-				minPrice = filter.Value
-			case "<", "<=":
-				maxPrice = filter.Value
-			}
-		case "volume":
-			switch filter.Operator {
-			case ">", ">=":
-				minVolume = int64(filter.Value)
-			}
-		}
-	}
-	return minPrice, maxPrice, minVolume
-}
-
 func (e *Engine) GetFutuOpendStatus() string {
 	if e.futuClient.IsConnected() {
 		return "connected"
@@ -421,26 +383,26 @@ func (e *Engine) optimizeOrderPrice(ctx context.Context, decision *llm.TradeDeci
 
 func (e *Engine) isDuplicateOrder(code, action string) bool {
 	key := fmt.Sprintf("%s:%s", code, action)
-	
+
 	e.recentOrdersMu.RLock()
 	lastOrderTime, exists := e.recentOrders[key]
 	e.recentOrdersMu.RUnlock()
-	
+
 	if !exists {
 		return false
 	}
-	
+
 	return time.Since(lastOrderTime) < 5*time.Minute
 }
 
 func (e *Engine) recordOrder(code, action string) {
 	key := fmt.Sprintf("%s:%s", code, action)
-	
+
 	e.recentOrdersMu.Lock()
 	defer e.recentOrdersMu.Unlock()
-	
+
 	e.recentOrders[key] = time.Now()
-	
+
 	for k, t := range e.recentOrders {
 		if time.Since(t) > 10*time.Minute {
 			delete(e.recentOrders, k)
@@ -487,12 +449,12 @@ func (e *Engine) getDefaultCandidates(market string) []futu.StockScreener {
 			{Code: "002415", Name: "海康威视"},
 		},
 	}
-	
+
 	if stocks, ok := defaultStocks[market]; ok {
 		log.Printf("使用默认股票池: %d 只股票", len(stocks))
 		return stocks
 	}
-	
+
 	log.Printf("未找到市场 %s 的默认股票池", market)
 	return []futu.StockScreener{}
 }

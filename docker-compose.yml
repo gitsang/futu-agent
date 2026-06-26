@@ -43,15 +43,17 @@ services:
       - ./config:/app/config
     environment:
       SERVER_PORT: "9080"
-      FUTU_OPEND_HOST: 127.0.0.1
-      FUTU_OPEND_PORT: "11111"
-      LLM_BASE_URL: ${LLM_BASE_URL:-https://token-plan-cn.xiaomimimo.com/v1}
-      LLM_API_KEY: ${LLM_API_KEY:-tp-ca7ufcktq93n1d4os497i20jh592iwagxz5g1e50zmtoudim}
-      LLM_MODEL: ${LLM_MODEL:-mimo-v2.5-pro}
-      HTTP_PROXY: http://ops.yl.c8g.top:7890
-      HTTPS_PROXY: http://ops.yl.c8g.top:7890
-      TRADING_ENABLED: ${TRADING_ENABLED:-true}
-      CONFIG_DIR: /app/config
+      FUTU_AGENT_FUTU_HOST: "127.0.0.1"
+      FUTU_AGENT_FUTU_PORT: "11111"
+      FUTU_AGENT_FUTU_ACCOUNT: ${FUTU_AGENT_FUTU_ACCOUNT:-36474237}
+      FUTU_AGENT_FUTU_PASSWORD_MD5: ${FUTU_AGENT_FUTU_PASSWORD_MD5:-d63b1d22c9141885b5809965be2e9d64}
+      FUTU_AGENT_LLM_BASE_URL: ${FUTU_AGENT_LLM_BASE_URL:-https://token-plan-cn.xiaomimimo.com/v1}
+      FUTU_AGENT_LLM_API_KEY: ${FUTU_AGENT_LLM_API_KEY:-tp-ca7ufcktq93n1d4os497i20jh592iwagxz5g1e50zmtoudim}
+      FUTU_AGENT_LLM_MODEL: ${FUTU_AGENT_LLM_MODEL:-mimo-v2.5-pro}
+      FUTU_AGENT_PROXY_HTTP: "http://ops.yl.c8g.top:7890"
+      FUTU_AGENT_PROXY_HTTPS: "http://ops.yl.c8g.top:7890"
+      FUTU_AGENT_TRADING_ENABLED: ${FUTU_AGENT_TRADING_ENABLED:-true}
+      FUTU_AGENT_CONFIG_PATH: /app/config/config.yaml
     depends_on:
       futu-opend:
         condition: service_healthy

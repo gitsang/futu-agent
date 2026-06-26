@@ -4,129 +4,187 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"strings"
+	"path/filepath"
 
+	"github.com/gitsang/configer"
 	"gopkg.in/yaml.v3"
 )
 
-type AgentRules struct {
-	AggressionLevel       string  `yaml:"aggression_level" json:"aggression_level"`
-	BuyOnDipThreshold     float64 `yaml:"buy_on_dip_threshold" json:"buy_on_dip_threshold"`
-	TakeProfitThreshold   float64 `yaml:"take_profit_threshold" json:"take_profit_threshold"`
-	StopLossThreshold     float64 `yaml:"stop_loss_threshold" json:"stop_loss_threshold"`
-	CashUsageMin          int     `yaml:"cash_usage_min" json:"cash_usage_min"`
-	CashUsageMax          int     `yaml:"cash_usage_max" json:"cash_usage_max"`
-	MaxCashRatio          int     `yaml:"max_cash_ratio" json:"max_cash_ratio"`
-	PositionLossThreshold float64 `yaml:"position_loss_threshold" json:"position_loss_threshold"`
-	LotSize               int     `yaml:"lot_size" json:"lot_size"`
-	LotSizeRule           string  `yaml:"lot_size_rule" json:"lot_size_rule"`
+type ServerConfig struct {
+	Port int `yaml:"port" mapstructure:"port" default:"9080" json:"port"`
 }
 
-type StockUniverseConfig struct {
-	Source       string                 `yaml:"source"`
-	ScreenConfig StockUniverseScreenConfig `yaml:"screen_config"`
-	Watchlist    []string               `yaml:"watchlist"`
+type FutuConfig struct {
+	Host        string `yaml:"host" mapstructure:"host" default:"localhost" json:"host"`
+	Port        int    `yaml:"port" mapstructure:"port" default:"11111" json:"port"`
+	Account     string `yaml:"account" mapstructure:"account" json:"account"`
+	PasswordMD5 string `yaml:"password_md5" mapstructure:"password_md5" json:"-"`
 }
+
+type LLMConfig struct {
+	BaseURL string `yaml:"base_url" mapstructure:"base_url" default:"https://api.openai.com/v1" json:"base_url"`
+	Model   string `yaml:"model" mapstructure:"model" default:"gpt-4" json:"model"`
+	APIKey  string `yaml:"api_key" mapstructure:"api_key" json:"-"`
+}
+
+type ProxyConfig struct {
+	HTTP  string `yaml:"http" mapstructure:"http" json:"http"`
+	HTTPS string `yaml:"https" mapstructure:"https" json:"https"`
+}
+
+type TradingConfig struct {
+	Enabled bool `yaml:"enabled" mapstructure:"enabled" default:"false" json:"enabled"`
+}
+
+type RuleTemplate struct {
+	AggressionLevel       string  `yaml:"aggression_level" mapstructure:"aggression_level" json:"aggression_level"`
+	BuyOnDipThreshold     float64 `yaml:"buy_on_dip_threshold" mapstructure:"buy_on_dip_threshold" json:"buy_on_dip_threshold"`
+	TakeProfitThreshold   float64 `yaml:"take_profit_threshold" mapstructure:"take_profit_threshold" json:"take_profit_threshold"`
+	StopLossThreshold     float64 `yaml:"stop_loss_threshold" mapstructure:"stop_loss_threshold" json:"stop_loss_threshold"`
+	CashUsageMin          int     `yaml:"cash_usage_min" mapstructure:"cash_usage_min" json:"cash_usage_min"`
+	CashUsageMax          int     `yaml:"cash_usage_max" mapstructure:"cash_usage_max" json:"cash_usage_max"`
+	MaxCashRatio          int     `yaml:"max_cash_ratio" mapstructure:"max_cash_ratio" json:"max_cash_ratio"`
+	PositionLossThreshold float64 `yaml:"position_loss_threshold" mapstructure:"position_loss_threshold" json:"position_loss_threshold"`
+	LotSize               int     `yaml:"lot_size" mapstructure:"lot_size" json:"lot_size"`
+	LotSizeRule           string  `yaml:"lot_size_rule" mapstructure:"lot_size_rule" json:"lot_size_rule"`
+}
+
+type AgentRules = RuleTemplate
+
+type StockUniverseTemplate struct {
+	ID           string                    `yaml:"id" mapstructure:"id" json:"id"`
+	Market       string                    `yaml:"market" mapstructure:"market" json:"market"`
+	Name         string                    `yaml:"name" mapstructure:"name" json:"name"`
+	Schedule     string                    `yaml:"schedule" mapstructure:"schedule" json:"schedule"`
+	Source       string                    `yaml:"source" mapstructure:"source" json:"source"`
+	ScreenConfig StockUniverseScreenConfig `yaml:"screen_config" mapstructure:"screen_config" json:"screen_config"`
+	Watchlist    []string                  `yaml:"watchlist" mapstructure:"watchlist" json:"watchlist"`
+}
+
+type StockUniverseConfig = StockUniverseTemplate
 
 type StockUniverseScreenConfig struct {
-	Market  string                       `yaml:"market"`
-	Filters []StockUniverseFilterConfig  `yaml:"filters"`
-	Sort    []StockUniverseSortConfig    `yaml:"sort"`
-	Limit   int                          `yaml:"limit"`
+	Market  string                      `yaml:"market" mapstructure:"market" json:"market"`
+	Filters []StockUniverseFilterConfig `yaml:"filters" mapstructure:"filters" json:"filters"`
+	Sort    []StockUniverseSortConfig   `yaml:"sort" mapstructure:"sort" json:"sort"`
+	Limit   int                         `yaml:"limit" mapstructure:"limit" json:"limit"`
 }
 
 type StockUniverseFilterConfig struct {
-	Field    string  `yaml:"field"`
-	Operator string  `yaml:"operator"`
-	Value    float64 `yaml:"value"`
-	Unit     string  `yaml:"unit"`
+	Field    string  `yaml:"field" mapstructure:"field" json:"field"`
+	Operator string  `yaml:"operator" mapstructure:"operator" json:"operator"`
+	Value    float64 `yaml:"value" mapstructure:"value" json:"value"`
+	Unit     string  `yaml:"unit" mapstructure:"unit" json:"unit"`
 }
 
 type StockUniverseSortConfig struct {
-	Field     string `yaml:"field"`
-	Direction string `yaml:"direction"`
+	Field     string `yaml:"field" mapstructure:"field" json:"field"`
+	Direction string `yaml:"direction" mapstructure:"direction" json:"direction"`
 }
 
 type AgentConfig struct {
-	ID              string              `yaml:"id" json:"id"`
-	Market          string              `yaml:"market" json:"market"`
-	Name            string              `yaml:"name" json:"name"`
-	Description     string              `yaml:"description" json:"description"`
-	LLMModel        string              `yaml:"llm_model" json:"llm_model"`
-	TradingStrategy string              `yaml:"trading_strategy" json:"trading_strategy"`
-	Enabled         bool                `yaml:"enabled" json:"enabled"`
-	Rules           AgentRules          `yaml:"rules" json:"rules"`
-	StockUniverse   StockUniverseConfig `yaml:"stock_universe"`
+	ID               string              `yaml:"id" mapstructure:"id" json:"id"`
+	Market           string              `yaml:"market" mapstructure:"market" json:"market"`
+	Name             string              `yaml:"name" mapstructure:"name" json:"name"`
+	Description      string              `yaml:"description" mapstructure:"description" json:"description"`
+	LLMModel         string              `yaml:"llm_model" mapstructure:"llm_model" json:"llm_model"`
+	Enabled          bool                `yaml:"enabled" mapstructure:"enabled" json:"enabled"`
+	StockUniverseRef string              `yaml:"stock_universe_ref" mapstructure:"stock_universe_ref" json:"stock_universe_ref"`
+	RuleRef          string              `yaml:"rule_ref" mapstructure:"rule_ref" json:"rule_ref"`
+	LotSize          int                 `yaml:"lot_size" mapstructure:"lot_size" json:"lot_size"`
+	LotSizeRule      string              `yaml:"lot_size_rule" mapstructure:"lot_size_rule" json:"lot_size_rule"`
+	TradingStrategy  string              `yaml:"trading_strategy" mapstructure:"trading_strategy" json:"trading_strategy"`
+	Rules            RuleTemplate        `yaml:"-" mapstructure:"-" json:"rules"`
+	StockUniverse    StockUniverseConfig `yaml:"-" mapstructure:"-" json:"stock_universe"`
 }
 
-type AgentsConfig struct {
-	Agents []AgentConfig `yaml:"agents"`
+type ResolvedAgentConfig struct {
+	AgentConfig
+	StockUniverse StockUniverseConfig `json:"stock_universe"`
+	Rules         RuleTemplate        `json:"rules"`
 }
 
 type Config struct {
-	ServerPort     int
-	FutuOpendHost  string
-	FutuOpendPort  int
-	LLMBaseURL     string
-	LLMModel       string
-	LLMAPIKey      string
-	HTTPProxy      string
-	TradingEnabled bool
-	ConfigDir      string
-	Agents         []AgentConfig
+	Server         ServerConfig            `yaml:"server" mapstructure:"server" json:"server"`
+	Futu           FutuConfig              `yaml:"futu" mapstructure:"futu" json:"futu"`
+	LLM            LLMConfig               `yaml:"llm" mapstructure:"llm" json:"llm"`
+	Proxy          ProxyConfig             `yaml:"proxy" mapstructure:"proxy" json:"proxy"`
+	Trading        TradingConfig           `yaml:"trading" mapstructure:"trading" json:"trading"`
+	StockUniverses []StockUniverseTemplate `yaml:"stock_universes" mapstructure:"stock_universes" json:"stock_universes"`
+	RuleTemplates  map[string]RuleTemplate `yaml:"rule_templates" mapstructure:"rule_templates" json:"rule_templates"`
+	Agents         []AgentConfig           `yaml:"agents" mapstructure:"agents" json:"agents"`
+	Log            map[string]string       `yaml:"log" mapstructure:"log" json:"log"`
+	ResolvedAgents []ResolvedAgentConfig   `yaml:"-" mapstructure:"-" json:"-"`
+	ServerPort     int                     `yaml:"-" mapstructure:"-" json:"-"`
+	FutuOpendHost  string                  `yaml:"-" mapstructure:"-" json:"-"`
+	FutuOpendPort  int                     `yaml:"-" mapstructure:"-" json:"-"`
+	LLMBaseURL     string                  `yaml:"-" mapstructure:"-" json:"-"`
+	LLMModel       string                  `yaml:"-" mapstructure:"-" json:"-"`
+	LLMAPIKey      string                  `yaml:"-" mapstructure:"-" json:"-"`
+	HTTPProxy      string                  `yaml:"-" mapstructure:"-" json:"-"`
+	TradingEnabled bool                    `yaml:"-" mapstructure:"-" json:"-"`
+	ConfigPath     string                  `yaml:"-" mapstructure:"-" json:"-"`
 }
 
 func Load() (*Config, error) {
-	cfg := &Config{
-		ServerPort:     getEnvAsInt("SERVER_PORT", 9080),
-		FutuOpendHost:  getEnv("FUTU_OPEND_HOST", "localhost"),
-		FutuOpendPort:  getEnvAsInt("FUTU_OPEND_PORT", 11111),
-		LLMBaseURL:     getEnv("LLM_BASE_URL", "https://api.openai.com/v1"),
-		LLMModel:       getEnv("LLM_MODEL", "gpt-4"),
-		LLMAPIKey:      getEnv("LLM_API_KEY", ""),
-		HTTPProxy:      getEnv("HTTP_PROXY", ""),
-		TradingEnabled: getEnvAsBool("TRADING_ENABLED", false),
-		ConfigDir:      getEnv("CONFIG_DIR", "./config"),
+	cfg := &Config{}
+	cfger := configer.New(
+		configer.WithTemplate(new(Config)),
+		configer.WithEnvBind(
+			configer.WithEnvPrefix("FUTU_AGENT"),
+			configer.WithEnvDelim("_"),
+		),
+	)
+
+	configPath := resolveConfigPath()
+	if err := cfger.Load(cfg, configPath); err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	if err := cfg.loadAgents(); err != nil {
-		log.Printf("Warning: Failed to load agents config: %v", err)
+	cfg.ConfigPath = configPath
+	if err := cfg.ResolveAgents(); err != nil {
+		return nil, err
 	}
-
+	cfg.syncLegacyFields()
+	log.Printf("Loaded %d agents from config", len(cfg.Agents))
 	return cfg, nil
 }
 
-func (c *Config) loadAgents() error {
-	configPath := fmt.Sprintf("%s/agents.yaml", c.ConfigDir)
-	
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			log.Printf("Agents config file not found at %s, using defaults", configPath)
-			c.Agents = []AgentConfig{
-				{
-					ID:              "cn-agent-01",
-					Market:          "CN",
-					Name:            "A股交易代理",
-					Description:     "专注于A股市场的自动交易代理",
-					LLMModel:        c.LLMModel,
-					TradingStrategy: "基于技术分析的A股交易策略",
-					Enabled:         true,
-				},
-			}
-			return nil
+func (c *Config) ResolveAgents() error {
+	stockUniverses := make(map[string]StockUniverseTemplate, len(c.StockUniverses))
+	for _, universe := range c.StockUniverses {
+		stockUniverses[universe.ID] = universe
+	}
+
+	resolved := make([]ResolvedAgentConfig, 0, len(c.Agents))
+	for i := range c.Agents {
+		agent := c.Agents[i]
+		universe, ok := stockUniverses[agent.StockUniverseRef]
+		if !ok {
+			return fmt.Errorf("agent %s references unknown stock universe %s", agent.ID, agent.StockUniverseRef)
 		}
-		return fmt.Errorf("failed to read agents config: %w", err)
-	}
+		rules, ok := c.RuleTemplates[agent.RuleRef]
+		if !ok {
+			return fmt.Errorf("agent %s references unknown rule template %s", agent.ID, agent.RuleRef)
+		}
 
-	var agentsConfig AgentsConfig
-	if err := yaml.Unmarshal(data, &agentsConfig); err != nil {
-		return fmt.Errorf("failed to parse agents config: %w", err)
-	}
+		rules.LotSize = agent.LotSize
+		rules.LotSizeRule = agent.LotSizeRule
+		if universe.ScreenConfig.Market == "" {
+			universe.ScreenConfig.Market = universe.Market
+		}
 
-	c.Agents = agentsConfig.Agents
-	log.Printf("Loaded %d agents from config", len(c.Agents))
+		agent.Rules = rules
+		agent.StockUniverse = universe
+		c.Agents[i].Rules = rules
+		c.Agents[i].StockUniverse = universe
+		resolved = append(resolved, ResolvedAgentConfig{
+			AgentConfig:   agent,
+			StockUniverse: universe,
+			Rules:         rules,
+		})
+	}
+	c.ResolvedAgents = resolved
 	return nil
 }
 
@@ -149,12 +207,22 @@ func (c *Config) GetAgentsByMarket(market string) []AgentConfig {
 	return result
 }
 
+func (c *Config) GetResolvedAgents() []ResolvedAgentConfig {
+	result := make([]ResolvedAgentConfig, len(c.ResolvedAgents))
+	copy(result, c.ResolvedAgents)
+	return result
+}
+
 func (c *Config) UpdateAgent(id string, enabled bool) bool {
 	for i := range c.Agents {
 		if c.Agents[i].ID == id {
 			c.Agents[i].Enabled = enabled
-			if err := c.saveAgents(); err != nil {
-				log.Printf("Failed to save agents config: %v", err)
+			if err := c.ResolveAgents(); err != nil {
+				log.Printf("Failed to resolve agents config: %v", err)
+				return false
+			}
+			if err := c.save(); err != nil {
+				log.Printf("Failed to save config: %v", err)
 				return false
 			}
 			return true
@@ -163,43 +231,48 @@ func (c *Config) UpdateAgent(id string, enabled bool) bool {
 	return false
 }
 
-func (c *Config) saveAgents() error {
-	configPath := fmt.Sprintf("%s/agents.yaml", c.ConfigDir)
-	
-	agentsConfig := AgentsConfig{Agents: c.Agents}
-	data, err := yaml.Marshal(&agentsConfig)
+func (c *Config) save() error {
+	data, err := yaml.Marshal(c)
 	if err != nil {
-		return fmt.Errorf("failed to marshal agents config: %w", err)
+		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write agents config: %w", err)
+	if err := os.WriteFile(c.ConfigPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
 	}
-
 	return nil
 }
 
-func getEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return strings.TrimSpace(value)
-	}
-	return defaultValue
+func (c *Config) syncLegacyFields() {
+	c.ServerPort = c.Server.Port
+	c.FutuOpendHost = c.Futu.Host
+	c.FutuOpendPort = c.Futu.Port
+	c.LLMBaseURL = c.LLM.BaseURL
+	c.LLMModel = c.LLM.Model
+	c.LLMAPIKey = c.LLM.APIKey
+	c.HTTPProxy = c.Proxy.HTTP
+	c.TradingEnabled = c.Trading.Enabled
 }
 
-func getEnvAsInt(key string, defaultValue int) int {
-	if value, exists := os.LookupEnv(key); exists {
-		if intValue, err := strconv.Atoi(strings.TrimSpace(value)); err == nil {
-			return intValue
-		}
+func resolveConfigPath() string {
+	if path := os.Getenv("FUTU_AGENT_CONFIG_PATH"); path != "" {
+		return path
 	}
-	return defaultValue
-}
+	if path := os.Getenv("CONFIG_PATH"); path != "" {
+		return path
+	}
+	if dir := os.Getenv("FUTU_AGENT_CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "config.yaml")
+	}
+	if dir := os.Getenv("CONFIG_DIR"); dir != "" {
+		return filepath.Join(dir, "config.yaml")
+	}
 
-func getEnvAsBool(key string, defaultValue bool) bool {
-	if value, exists := os.LookupEnv(key); exists {
-		if boolValue, err := strconv.ParseBool(strings.TrimSpace(value)); err == nil {
-			return boolValue
+	paths := []string{"config/config.yaml", "../config/config.yaml", "/app/config/config.yaml"}
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			return path
 		}
 	}
-	return defaultValue
+	return "config/config.yaml"
 }

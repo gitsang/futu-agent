@@ -19,6 +19,7 @@ import (
 	"github.com/gitsang/futu-agent/backend/internal/services/agent"
 	"github.com/gitsang/futu-agent/backend/internal/services/futu"
 	"github.com/gitsang/futu-agent/backend/internal/services/llm"
+	"github.com/gitsang/futu-agent/backend/internal/services/universe"
 	"github.com/gitsang/futu-agent/backend/internal/store"
 )
 
@@ -37,7 +38,8 @@ func main() {
 	defer futuClient.Close()
 
 	llmClient := llm.NewClient(cfg.LLMBaseURL, cfg.LLMModel, cfg.LLMAPIKey, cfg.HTTPProxy)
-	agentEngine := agent.NewEngine(memoryStore, futuClient, llmClient, cfg)
+	universeService := universe.NewService(futuClient)
+	agentEngine := agent.NewEngine(memoryStore, futuClient, llmClient, cfg, universeService)
 
 	handler := handlers.NewHandler(memoryStore, cfg, agentEngine, futuClient)
 
@@ -99,6 +101,11 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	defer universeService.Stop()
+
+	if err := universeService.Start(ctx, cfg.StockUniverses); err != nil {
+		log.Printf("Warning: Failed to start universe service: %v", err)
+	}
 
 	if err := agentEngine.Start(ctx); err != nil {
 		log.Printf("Warning: Failed to start agent engine: %v", err)
