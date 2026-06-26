@@ -305,16 +305,6 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 	if e.tradingEnabled {
 		if e.isDuplicateOrder(decision.Code, decision.Action) {
 			log.Printf("Agent %s 重复下单检测: %s %s 已在最近5分钟内下过单，跳过", worker.AgentID, decision.Action, decision.Code)
-			e.store.SaveDecision(store.TradeDecision{
-				AgentID:   worker.AgentID,
-				StockCode: decision.Code,
-				Market:    decision.Market,
-				Action:    decision.Action,
-				Quantity:  decision.Quantity,
-				Price:     decision.Price,
-				Reason:    fmt.Sprintf("%s (重复下单，已跳过)", decision.Reason),
-				Executed:  false,
-			})
 			return
 		}
 
@@ -323,16 +313,6 @@ func (e *Engine) executeAgent(worker *AgentWorker) {
 
 		if err := e.validateOrder(decision, positions, accountFunds); err != nil {
 			log.Printf("Agent %s 订单校验失败: %v", worker.AgentID, err)
-			e.store.SaveDecision(store.TradeDecision{
-				AgentID:   worker.AgentID,
-				StockCode: decision.Code,
-				Market:    decision.Market,
-				Action:    decision.Action,
-				Quantity:  decision.Quantity,
-				Price:     decision.Price,
-				Reason:    fmt.Sprintf("%s (校验失败: %s)", decision.Reason, err.Error()),
-				Executed:  false,
-			})
 			return
 		}
 

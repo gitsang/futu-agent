@@ -518,29 +518,39 @@ func (c *Client) ScreenStocks(ctx context.Context, market string, minPrice, maxP
 		return nil, fmt.Errorf("unsupported market: %s", market)
 	}
 
+	log.Printf("ScreenStocks: market=%s, minPrice=%.2f, maxPrice=%.2f, minVolume=%d, markets=%v", market, minPrice, maxPrice, minVolume, markets)
+
 	const pageSize int32 = 100
 	result := make([]StockScreener, 0, pageSize)
 	for _, marketConst := range markets {
+		totalFetched := 0
+		totalFiltered := 0
 		for begin := int32(0); ; begin += pageSize {
 			stocks, err := client.StockFilter(ctx, c.sdkClient, marketConst, begin, pageSize)
 			if err != nil {
 				return nil, fmt.Errorf("StockFilter failed for %s: %w", market, err)
 			}
 
+			totalFetched += len(stocks)
 			for _, stock := range stocks {
 				candidate := stockFilterResultToCandidate(stock)
 				if !candidateMatches(candidate, minPrice, maxPrice, minVolume) {
 					continue
 				}
+				totalFiltered++
 				result = append(result, candidateToScreener(candidate))
 			}
+
+			log.Printf("ScreenStocks: marketConst=%d, begin=%d, fetched=%d, filtered=%d, total_result=%d", marketConst, begin, len(stocks), totalFiltered, len(result))
 
 			if len(stocks) < int(pageSize) {
 				break
 			}
 		}
+		log.Printf("ScreenStocks: marketConst=%d done, totalFetched=%d, totalFiltered=%d", marketConst, totalFetched, totalFiltered)
 	}
 
+	log.Printf("ScreenStocks: final result count=%d", len(result))
 	return result, nil
 }
 
