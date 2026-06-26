@@ -47,7 +47,7 @@
 		<tbody>
 			{#if loading}
 				{#each Array(3) as _}
-					<tr class="border-b border-border-subtle">
+					<tr class="border-b border-border">
 						{#each columns as _}
 							<td class="px-4 py-3">
 								<div class="h-4 w-20 animate-pulse rounded bg-muted"></div>
@@ -63,7 +63,7 @@
 				</tr>
 			{:else}
 				{#each data as row}
-					<tr class="border-b border-border-subtle transition-colors hover:bg-muted/50">
+					<tr class="border-b border-border transition-colors hover:bg-muted/50">
 						{#each columns as column}
 							<td
 								class={cn(

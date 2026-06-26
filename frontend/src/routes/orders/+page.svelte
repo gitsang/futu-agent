@@ -152,7 +152,7 @@
 				<tbody>
 					{#if loading}
 						{#each Array(3) as _}
-							<tr class="border-b border-border-subtle">
+							<tr class="border-b border-border">
 								{#each Array(10) as _}
 									<td class="px-4 py-3">
 										<div class="h-4 w-16 animate-pulse rounded bg-muted"></div>
@@ -168,7 +168,7 @@
 					</tr>
 				{:else}
 					{#each orders as order}
-							<tr class="border-b border-border-subtle transition-colors hover:bg-muted/50">
+							<tr class="border-b border-border transition-colors hover:bg-muted/50">
 								<td class="px-4 py-3">
 									<div class="font-mono text-xs text-muted-foreground">{order.order_id?.slice(-8) || '-'}</div>
 								</td>

@@ -185,7 +185,7 @@
 				<tbody>
 					{#if loading}
 						{#each Array(3) as _}
-							<tr class="border-b border-border-subtle">
+							<tr class="border-b border-border">
 								{#each Array(7) as _}
 									<td class="px-4 py-3">
 										<div class="h-4 w-16 animate-pulse rounded bg-muted"></div>
@@ -200,10 +200,10 @@
 							</td>
 						</tr>
 					{:else}
-				{#each sortedPositions as pos}
+					{#each sortedPositions as pos}
 						{@const pnl = (pos.current_price - pos.avg_cost) * pos.quantity}
 						{@const pnlPercent = pos.avg_cost > 0 ? ((pos.current_price - pos.avg_cost) / pos.avg_cost) * 100 : 0}
-						<tr class="border-b border-border-subtle transition-colors hover:bg-muted/50">
+						<tr class="border-b border-border transition-colors hover:bg-muted/50">
 							<td class="px-4 py-3">
 								<div class="font-medium text-foreground">{pos.code}</div>
 								<div class="text-xs text-muted-foreground">{pos.name}</div>
