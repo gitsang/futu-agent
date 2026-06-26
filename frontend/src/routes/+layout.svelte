@@ -30,64 +30,64 @@
 
 	<aside
 		class={cn(
-			'fixed inset-y-0 left-0 z-50 w-72 bg-card border-r border-border flex flex-col transition-transform duration-300 lg:static lg:translate-x-0',
+			'fixed inset-y-0 left-0 z-50 w-80 bg-card border-r border-border flex flex-col transition-transform duration-300 lg:static lg:translate-x-0',
 			sidebarOpen ? 'translate-x-0' : '-translate-x-full'
 		)}
 	>
-		<div class="flex items-center gap-4 px-6 py-6 border-b border-border">
-			<div class="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-				<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+		<div class="flex items-center gap-5 px-8 py-8 border-b border-border">
+			<div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+				<svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
 				</svg>
 			</div>
 			<div>
-				<h1 class="text-xl font-bold text-foreground">Futu Agent</h1>
-				<p class="text-sm text-muted-foreground">智能交易系统</p>
+				<h1 class="text-2xl font-bold text-foreground">Futu Agent</h1>
+				<p class="text-base text-muted-foreground">智能交易系统</p>
 			</div>
 		</div>
 
-		<nav class="flex-1 px-4 py-6 space-y-2">
+		<nav class="flex-1 px-5 py-8 space-y-3">
 			{#each navItems as item}
 				{@const isActive = $page.url.pathname === item.href}
 				<a
 					href={item.href}
 					class={cn(
-						'flex items-center gap-4 rounded-xl px-4 py-3.5 text-base font-medium transition-all duration-200',
+						'flex items-center gap-5 rounded-2xl px-5 py-4 text-lg font-medium transition-all duration-200',
 						isActive
 							? 'bg-primary/10 text-primary shadow-sm'
 							: 'text-muted-foreground hover:text-foreground hover:bg-muted'
 					)}
 					onclick={() => sidebarOpen = false}
 				>
-					<span class="text-xl">{item.icon}</span>
+					<span class="text-2xl">{item.icon}</span>
 					<span>{item.label}</span>
 				</a>
 			{/each}
 		</nav>
 
-		<div class="border-t border-border px-4 py-5 space-y-3">
+		<div class="border-t border-border px-5 py-6 space-y-4">
 			<StatusIndicator status="online" label="服务运行中" />
 			<StatusIndicator status="online" label="Futu OpenD 已连接" />
 		</div>
 	</aside>
 
 	<div class="flex flex-1 flex-col overflow-hidden">
-		<header class="flex items-center justify-between border-b border-border bg-card px-5 py-4 lg:px-8 lg:py-5">
+		<header class="flex items-center justify-between border-b border-border bg-card px-6 py-5 lg:px-8 lg:py-6">
 			<button
-				class="rounded-xl p-3 text-muted-foreground hover:text-foreground hover:bg-muted lg:hidden"
+				class="rounded-2xl p-3 text-muted-foreground hover:text-foreground hover:bg-muted lg:hidden"
 				onclick={() => sidebarOpen = !sidebarOpen}
 				aria-label="切换侧边栏"
 			>
-				<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
 				</svg>
 			</button>
 
-			<div class="flex items-center gap-2 flex-wrap">
+			<div class="flex items-center gap-3 flex-wrap">
 				{#each MARKETS as market}
 					<button
 						class={cn(
-							'rounded-xl px-4 py-2.5 text-sm font-semibold transition-all duration-200',
+							'rounded-2xl px-5 py-3 text-base font-semibold transition-all duration-200',
 							$selectedMarket === market.id
 								? 'bg-primary text-primary-foreground shadow-md'
 								: 'text-muted-foreground hover:text-foreground hover:bg-muted'
@@ -99,28 +99,28 @@
 				{/each}
 			</div>
 
-			<div class="flex items-center gap-4">
-				<div class="hidden sm:flex items-center gap-3 rounded-xl bg-muted px-4 py-3">
-					<svg class="h-5 w-5 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+			<div class="flex items-center gap-5">
+				<div class="hidden sm:flex items-center gap-3 rounded-2xl bg-muted px-5 py-3">
+					<svg class="h-6 w-6 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
 					</svg>
 					<input
 						type="text"
 						placeholder="搜索..."
-						class="bg-transparent text-sm text-foreground placeholder-muted-foreground outline-none w-48"
+						class="bg-transparent text-base text-foreground placeholder-muted-foreground outline-none w-52"
 					/>
 				</div>
 
-				<button class="relative rounded-xl p-3 text-muted-foreground hover:text-foreground hover:bg-muted" aria-label="通知">
-					<svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+				<button class="relative rounded-2xl p-3 text-muted-foreground hover:text-foreground hover:bg-muted" aria-label="通知">
+					<svg class="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
 						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
 					</svg>
-					<span class="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-primary"></span>
+					<span class="absolute right-2.5 top-2.5 h-3 w-3 rounded-full bg-primary"></span>
 				</button>
 			</div>
 		</header>
 
-		<main class="flex-1 overflow-y-auto p-5 lg:p-8">
+		<main class="flex-1 overflow-y-auto p-6 lg:p-8">
 			{@render children()}
 		</main>
 	</div>
